@@ -13,3 +13,11 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     avatar = Column(String(255), nullable=True)
     created_at = Column(DateTime(Timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+class Team(Base):
+    __tablename__ = "teams"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+
