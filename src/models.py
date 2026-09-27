@@ -76,3 +76,16 @@ class Player(Base):
     control = Column(Integer, nullable=False)
     speed = Column(Integer, nullable=False)
     strength = Column(Integer, nullable=False)
+ 
+class LeagueStanding(Base):
+    __tablename__ = "league_standings"
+
+    league_id = Column(Integer, ForeignKey("leagues.id_league"), primary_key=True)
+    team_id = Column(Integer, ForeignKey("teams.owner_id"), primary_key=True)
+
+    points = Column(Integer, default=0, nullable=False)
+    matches_won = Column(Integer, default=0, nullable=False)
+    matches_drawn = Column(Integer, default=0, nullable=False)
+    matches_lost = Column(Integer, default=0, nullable=False)
+    goals_for = Column(Integer, default=0, nullable=False)
+    goals_against = Column(Integer, default=0, nullable=False)
