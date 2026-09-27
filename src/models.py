@@ -8,17 +8,18 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    nickname = Column(String(50), unique=True, nullable=False, index=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(120), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     avatar = Column(String(255), nullable=True)
-    created_at = Column(DateTime(Timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
 class Team(Base):
     __tablename__ = "teams"
 
     owner_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     name = Column(String(100), nullable=False)
+    accurate_league = Column(Integer, ForeignKey("leagues.id"), nullable=True)
     
 
 class Record(Base):
@@ -57,3 +58,21 @@ class MatchResult(Base):
     match_id = Column(Integer, ForeignKey("matches.id"), primary_key=True)
     home_goals = Column(Integer, default=0, nullable=False)
     away_goals = Column(Integer, default=0, nullable=False)
+
+class Player(Base):
+    __tablename__ = "players"
+    
+    id = Column(Integer, primary_key=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    behavior_id = Column(Integer, ForeignKey("behaviors.id"), nullable=True)
+
+    shirt_number = Column(Integer, nullable=False)
+    name = Column(String(50), nullable=False)
+    is_starter = Column(Boolean, default=False, nullable=False)  # titular vs suplente
+
+    power = Column(Integer, nullable=False)
+    agility = Column(Integer, nullable=False)
+    control = Column(Integer, nullable=False)
+    speed = Column(Integer, nullable=False)
+    strength = Column(Integer, nullable=False)
