@@ -21,3 +21,13 @@ class Team(Base):
     name = Column(String(100), unique=True, nullable=False, index=True)
     owner_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
 
+class Record(Base):
+    __tablename__ = "records"
+
+    id = Column(Integer, primary_key=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), unique=True, nullable=False)
+    leagues_won = Column(Integer, default=0, nullable=False)
+    total_points = Column(Integer, default=0, nullable=False)
+    matches_won = Column(Integer, default=0, nullable=False)
+    matches_lost = Column(Integer, default=0, nullable=False)
+    matches_drawn = Column(Integer, default=0, nullable=False)
