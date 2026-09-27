@@ -25,7 +25,7 @@ class Team(Base):
 class Record(Base):
     __tablename__ = "records"
 
-    team_id = Column(Integer, ForeignKey("teams.id"), primary_key=True)
+    team_id = Column(Integer, ForeignKey("teams.owner_id"), primary_key=True)
     leagues_won = Column(Integer, default=0, nullable=False)
     total_points = Column(Integer, default=0, nullable=False)
     matches_won = Column(Integer, default=0, nullable=False)
@@ -46,8 +46,8 @@ class Match(Base):
 
     id_match = Column(Integer, primary_key=True)
     league_id = Column(Integer, ForeignKey("leagues.id"), nullable=True)
-    home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
-    away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    home_team_id = Column(Integer, ForeignKey("teams.owner_id"), nullable=False)
+    away_team_id = Column(Integer, ForeignKey("teams.owner_id"), nullable=False)
     scheduled_at = Column(DateTime, nullable=False)
     in_progress = Column(Boolean, default=False, nullable=False)
     current_period = Column(Integer, default=0, nullable=False)  # 0=no iniciado, 1-4 tiempos
@@ -93,9 +93,20 @@ class LeagueStanding(Base):
 class GlobalRankingEntry(Base):
     __tablename__ = "global_ranking_entries"
 
-    team_id = Column(Integer, ForeignKey("team.team_id"), primary_key=True)
+    team_id = Column(Integer, ForeignKey("team.owner_id"), primary_key=True)
 
     total_points = Column(Integer, default=0, nullable=False)
     matches_won = Column(Integer, default=0, nullable=False)
     goals_for = Column(Integer, default=0, nullable=False)
-    rank_position = Column(Integer, nullable=True)
+
+class League(Base):
+    __tablename__ = "leagues"
+
+    id_league = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    is_private = Column(Boolean, default=False, nullable=False)
+    password_hash = Column(String(255), nullable=True)  # solo si is_private=True
+    min_teams = Column(Integer, nullable=False, default=3)
+    max_teams = Column(Integer, nullable=False)
+    match_duration = Column(Integer, nullable=False)  # minutos por tiempo, o duración total, a definir
+    status = Column(String(20), default="pending", nullable=False)  # pending / in_progress / finished
