@@ -39,3 +39,14 @@ class Behavior(Base):
     name = Column(String(50), nullable=False)
     python_code = Column(Text, nullable=False)              # se usa Txt para permitir código más largo
     is_default = Column(Boolean, default=False, nullable=False)
+
+class Match(Base):
+    __tablename__ = "matches"
+
+    id_match = Column(Integer, primary_key=True)
+    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=True)
+    home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    scheduled_at = Column(DateTime, nullable=False)
+    in_progress = Column(Boolean, default=False, nullable=False)
+    current_period = Column(Integer, default=0, nullable=False)  # 0=no iniciado, 1-4 tiempos
