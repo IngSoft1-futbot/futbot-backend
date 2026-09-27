@@ -35,7 +35,7 @@ class Record(Base):
 class Behavior(Base):
     __tablename__ = "behaviors"
 
-    id_behavior = Column(Integer, primary_key=True)
+    id_behavior = Column(Integer, primary_key=True ) # empieza desde 1, 0 es el behavior por defecto
     creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     name = Column(String(50), nullable=False)
     python_code = Column(Text, nullable=False)              # se usa Txt para permitir código más largo
@@ -62,10 +62,10 @@ class MatchResult(Base):
 class Player(Base):
     __tablename__ = "players"
     
-    id = Column(Integer, primary_key=True)
+    player_id = Column(Integer, primary_key=True)
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
-    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    behavior_id = Column(Integer, ForeignKey("behaviors.id"), nullable=True)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    behavior_id = Column(Integer, ForeignKey("behaviors.id"), default=0) # id del bahavior por defecto 
 
     shirt_number = Column(Integer, nullable=False)
     name = Column(String(50), nullable=False)
@@ -89,3 +89,13 @@ class LeagueStanding(Base):
     matches_lost = Column(Integer, default=0, nullable=False)
     goals_for = Column(Integer, default=0, nullable=False)
     goals_against = Column(Integer, default=0, nullable=False)
+
+class GlobalRankingEntry(Base):
+    __tablename__ = "global_ranking_entries"
+
+    team_id = Column(Integer, ForeignKey("team.team_id"), primary_key=True)
+
+    total_points = Column(Integer, default=0, nullable=False)
+    matches_won = Column(Integer, default=0, nullable=False)
+    goals_for = Column(Integer, default=0, nullable=False)
+    rank_position = Column(Integer, nullable=True)
