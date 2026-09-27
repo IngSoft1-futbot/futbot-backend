@@ -50,3 +50,10 @@ class Match(Base):
     scheduled_at = Column(DateTime, nullable=False)
     in_progress = Column(Boolean, default=False, nullable=False)
     current_period = Column(Integer, default=0, nullable=False)  # 0=no iniciado, 1-4 tiempos
+
+class MatchResult(Base):
+    __tablename__ = "match_results"
+
+    match_id = Column(Integer, ForeignKey("matches.id"), primary_key=True)
+    home_goals = Column(Integer, default=0, nullable=False)
+    away_goals = Column(Integer, default=0, nullable=False)
