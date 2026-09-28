@@ -3,7 +3,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from models import Base
+from .models import Base
 
 # Direccion de la base. Se lee de una variable de entorno para no dejar la
 # contraseña escrita en el codigo. El valor por defecto es solo para desarrollo local.
