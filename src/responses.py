@@ -13,6 +13,10 @@ REGISTER_RESPONSES = {
                     "username_in_use": {
                         "summary": "Username already in use",
                         "value": {"detail": "Username already in use."}
+                    },
+                    "password_invalid": {
+                        "summary": "Password does not meet requirements",
+                        "value": {"detail": "Password does not meet requirements."}
                     }
                 }
             }

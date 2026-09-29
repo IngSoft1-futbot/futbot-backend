@@ -1,18 +1,16 @@
 from datetime import datetime
 from typing import Optional, Annotated
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, EmailStr, StringConstraints
 
 Username = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=50)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
-
 
 class UserCreate(BaseModel):
     username: Username
     name: Name
     email: EmailStr
-    password: str = Field(min_length=8, max_length=72)
+    password: str
     avatar: Optional[str] = None
-
 
 class UserOut(BaseModel):
     id: int
@@ -27,6 +25,8 @@ class UserOut(BaseModel):
 class RegistrationError(Exception):
     pass
 class EmailAlreadyExistsError(RegistrationError):
+    pass
+class PasswordValidationError(RegistrationError):
     pass
 class UsernameAlreadyExistsError(RegistrationError):
     pass

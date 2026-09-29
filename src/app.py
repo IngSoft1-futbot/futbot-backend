@@ -43,6 +43,11 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already in use.",
         )
+    except schemas.PasswordValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= str(e),
+        )
     except schemas.RegistrationError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
