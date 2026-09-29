@@ -55,27 +55,6 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_409_CONFLICT,
             detail="Conflict in register time.",
         )
-
-@app.post("/auth/login/") 
-def login_endpoint(request : schemas.UserLoginIn):  
-    user_token: str | None = auth_login(request.email , request.password)
-
-    try:
-        if user_token is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Something went wrong, please try again.",
-            )
-    except schemas.BadCredentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect Email or Password, try again."
-        )
-    except schemas.Fobbiden:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden"
-        )
     
 @app.post("/users/{user_id}/players")
 def create_user_player(user_id : int, player : schemas.PlayerIn):
