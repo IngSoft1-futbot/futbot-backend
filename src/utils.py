@@ -1,4 +1,8 @@
+from typing import Any
+from .schemas import PlayerIn
 import bcrypt
+
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -26,7 +30,7 @@ def register_user(db: Session, user_in: schemas.UserCreate):
     # valida antes de tocar la base de datos
     password_validation(user_in.password)
 
-    email = user_in.email.lower()
+    email= user_in.email.lower()
     # 1. Chequeo previo (optimizacion: evita hashear si ya existe)
     if repo.get_user_by_email(db, email=email):
         raise schemas.EmailAlreadyExistsError()
@@ -47,3 +51,22 @@ def register_user(db: Session, user_in: schemas.UserCreate):
         )
     except IntegrityError:
         raise schemas.RegistrationError()
+
+
+def validate_pacss(pacss)-> bool:
+    
+    attributes: list[int] = [pacss.power, pacss.agility, pacss.control, pacss.speed, pacss.strength]
+    if not all(20 <= attr <= 100 for attr in attributes):
+        return False
+
+    if sum(attributes) != 300:
+        return False
+
+    return True
+
+def verify_player(player: PlayerIn)-> bool:
+
+    pacss: schemas.PacssAttributes = player.pacss_attributes
+
+    return validate_pacss(pacss)
+
