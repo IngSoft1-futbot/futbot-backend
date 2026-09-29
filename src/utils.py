@@ -14,8 +14,10 @@ def register_user(db: Session, user_in: schemas.UserCreate):
     email = user_in.email.lower()
 
     # 1. Chequeo previo (optimizacion: evita hashear si ya existe)
-    if repo.get_user_by_email_or_username(db, email=email, username=user_in.username):
-        raise schemas.UserAlreadyExistsError()
+    if repo.get_user_by_email(db, email=email):
+        raise schemas.EmailAlreadyExistsError()
+    if repo.get_user_by_username(db, username=user_in.username):
+        raise schemas.UsernameAlreadyExistsError()
 
     # 2. Hash (nunca se guarda la contraseña en texto plano)
     password_hash = hash_password(user_in.password)
@@ -31,4 +33,4 @@ def register_user(db: Session, user_in: schemas.UserCreate):
             avatar=user_in.avatar,
         )
     except IntegrityError:
-        raise schemas.UserAlreadyExistsError()
+        raise schemas.RegistrationError()

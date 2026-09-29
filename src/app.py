@@ -3,8 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from contextlib import asynccontextmanager
 
-from . import schemas, utils, product_repository as repo
-
+from . import schemas, utils, product_repository as repo, responses
 from .database import get_db, init_db
 
 
@@ -27,16 +26,27 @@ app.add_middleware(
 @app.post(
     "/auth/register",
     response_model=schemas.UserOut,
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_201_CREATED,  
     tags=["users"],
+    responses=responses.REGISTER_RESPONSES
 )
 def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
     try:
         return utils.register_user(db, user_in)
-    except schemas.UserAlreadyExistsError:
+    except schemas.EmailAlreadyExistsError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email or username already in use.",
+            detail="Email already in use.",
+        )
+    except schemas.UsernameAlreadyExistsError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already in use.",
+        )
+    except schemas.RegistrationError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conflict in register time.",
         )
 
 if __name__ == '__main__':

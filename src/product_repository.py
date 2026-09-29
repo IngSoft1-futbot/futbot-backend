@@ -1,21 +1,27 @@
 from typing import Optional
-
-from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import models
 
 
-def get_user_by_email_or_username(
-    db: Session, *, email: str, username: str
+def get_user_by_email(
+    db: Session, *, email: str
 ) -> Optional[models.User]:
     return (
         db.query(models.User)
-        .filter(or_(models.User.email == email, models.User.username == username))
+        .filter(models.User.email == email)
         .first()
     )
 
+def get_user_by_username(
+    db: Session, *, username: str
+) -> Optional[models.User]:
+    return (
+        db.query(models.User)
+        .filter(models.User.username == username)
+        .first()
+    )
 
 def create_user(
     db: Session,

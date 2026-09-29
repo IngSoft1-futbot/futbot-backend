@@ -24,5 +24,9 @@ class UserOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)  # permite leer desde el ORM
 
-class UserAlreadyExistsError(Exception):
+class RegistrationError(Exception):
+    pass
+class EmailAlreadyExistsError(RegistrationError):
+    pass
+class UsernameAlreadyExistsError(RegistrationError):
     pass
