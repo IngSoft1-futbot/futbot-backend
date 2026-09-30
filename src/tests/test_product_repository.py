@@ -48,3 +48,23 @@ def test_create_user_duplicado_lanza_integrity_error(db):
     make_user(db)
     with pytest.raises(IntegrityError):
         make_user(db, club="otro", email="juan@gmail.com")   # mismo email
+
+# ==========================================
+# TESTS DE LOGIN (Añadidos)
+# ==========================================
+
+
+def test_get_user_by_email_retorna_password_hash_para_login(db):
+    # 1. Creamos un usuario de prueba
+    repo.create_user(
+        db, club="login_user", name="Login Test",
+        email="login@gmail.com", password_hash="password123", avatar=None,
+    )
+    
+    # 2. Buscamos el usuario por email como hace el login
+    user = repo.get_user_by_email(db, email="login@gmail.com")
+    
+    # 3. Verificamos que traiga el usuario y su password para validar
+    assert user is not None
+    assert user.email == "login@gmail.com"
+    assert user.password_hash == "password123"
