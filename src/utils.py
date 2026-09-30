@@ -1,11 +1,9 @@
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import product_repository as repo
 from . import schemas
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def password_validation(password: str):
     if len(password) < 8 or len(password) > 12:
@@ -22,7 +20,7 @@ def password_validation(password: str):
         raise schemas.PasswordValidationError("Password must contain at least one special character.")
     
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def register_user(db: Session, user_in: schemas.UserCreate):
     # valida antes de tocar la base de datos
