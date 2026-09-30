@@ -14,26 +14,26 @@ def get_user_by_email(
         .first()
     )
 
-def get_user_by_username(
-    db: Session, *, username: str
+def get_user_by_club(
+    db: Session, *, club: str
 ) -> Optional[models.User]:
     return (
         db.query(models.User)
-        .filter(models.User.username == username)
+        .filter(models.User.club == club)
         .first()
     )
 
 def create_user(
     db: Session,
     *,
-    username: str,
+    club: str,
     name: str,
     email: str,
     password_hash: str,
     avatar: Optional[str],
 ) -> models.User:
     user = models.User(
-        username=username,
+        club=club,
         name=name,
         email=email,
         password_hash=password_hash,

@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from src import schemas, utils
 
 USER_IN = schemas.UserCreate(
-    username="juan",
+    club="juan",
     name="Juan",
     email="Juan@Gmail.com",
     password="Clave123!",
@@ -58,15 +58,15 @@ def test_register_email_ya_existe(repo_mock):
     with pytest.raises(schemas.EmailAlreadyExistsError):
         utils.register_user(MagicMock(), USER_IN)
 
-    repo_mock.get_user_by_username.assert_not_called()
+    repo_mock.get_user_by_club.assert_not_called()
     repo_mock.create_user.assert_not_called()
 
 
-def test_register_username_ya_existe(repo_mock):
+def test_register_club_ya_existe(repo_mock):
     repo_mock.get_user_by_email.return_value = None
-    repo_mock.get_user_by_username.return_value = object()
+    repo_mock.get_user_by_club.return_value = object()
 
-    with pytest.raises(schemas.UsernameAlreadyExistsError):
+    with pytest.raises(schemas.ClubAlreadyExistsError):
         utils.register_user(MagicMock(), USER_IN)
 
     repo_mock.create_user.assert_not_called()
@@ -74,7 +74,7 @@ def test_register_username_ya_existe(repo_mock):
 
 def test_register_ok(repo_mock):
     repo_mock.get_user_by_email.return_value = None
-    repo_mock.get_user_by_username.return_value = None
+    repo_mock.get_user_by_club.return_value = None
 
     utils.register_user(MagicMock(), USER_IN)
 
@@ -87,7 +87,7 @@ def test_register_ok(repo_mock):
 
 def test_register_integrity_error_se_convierte_en_registration_error(repo_mock):
     repo_mock.get_user_by_email.return_value = None
-    repo_mock.get_user_by_username.return_value = None
+    repo_mock.get_user_by_club.return_value = None
     repo_mock.create_user.side_effect = IntegrityError("stmt", {}, Exception())
 
     with pytest.raises(schemas.RegistrationError):

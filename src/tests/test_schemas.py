@@ -6,7 +6,7 @@ from src import schemas
 
 def make(**over):
     data = {
-        "username": "juan",
+        "club": "juan",
         "name": "Juan",
         "email": "juan@gmail.com",
         "password": "Clave123!",
@@ -17,21 +17,21 @@ def make(**over):
 
 def test_usuario_valido():
     user = make()
-    assert user.username == "juan"
+    assert user.club == "juan"
 
 
 def test_avatar_es_opcional():
     assert make().avatar is None
 
 
-def test_username_se_recorta():
-    assert make(username="  juan  ").username == "juan"
+def test_club_se_recorta():
+    assert make(club="  juan  ").club == "juan"
 
 
-@pytest.mark.parametrize("username", ["ab", "   ", "a" * 51])
-def test_username_invalido(username):
+@pytest.mark.parametrize("club", ["ab", "   ", "a" * 51])
+def test_club_invalido(club):
     with pytest.raises(ValidationError):
-        make(username=username)
+        make(club=club)
 
 
 @pytest.mark.parametrize("name", ["", "   ", "a" * 51])
@@ -48,7 +48,7 @@ def test_email_invalido(email):
 
 def test_falta_password():
     with pytest.raises(ValidationError):
-        schemas.UserCreate(username="juan", name="Juan", email="juan@gmail.com")
+        schemas.UserCreate(club="juan", name="Juan", email="juan@gmail.com")
 
 
 def test_schema_no_valida_la_fuerza_de_la_password():

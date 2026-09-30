@@ -10,9 +10,9 @@ REGISTER_RESPONSES = {
                         "summary": "Email already in use",
                         "value": {"detail": "Email already in use."}
                     },
-                    "username_in_use": {
-                        "summary": "Username already in use",
-                        "value": {"detail": "Username already in use."}
+                    "club_in_use": {
+                        "summary": "Club name already in use",
+                        "value": {"detail": "Club name already in use."}
                     },
                     "password_invalid": {
                         "summary": "Password does not meet requirements",

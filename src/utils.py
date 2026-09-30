@@ -32,8 +32,8 @@ def register_user(db: Session, user_in: schemas.UserCreate):
     # 1. Chequeo previo (optimizacion: evita hashear si ya existe)
     if repo.get_user_by_email(db, email=email):
         raise schemas.EmailAlreadyExistsError()
-    if repo.get_user_by_username(db, username=user_in.username):
-        raise schemas.UsernameAlreadyExistsError()
+    if repo.get_user_by_club(db, club=user_in.club):
+        raise schemas.ClubAlreadyExistsError()
     # 2. Hash (nunca se guarda la contraseña en texto plano)
     password_hash = hash_password(user_in.password)
 
@@ -41,7 +41,7 @@ def register_user(db: Session, user_in: schemas.UserCreate):
     try:
         return repo.create_user(
             db,
-            username=user_in.username,
+            club=user_in.club,
             name=user_in.name,
             email=email,
             password_hash=password_hash,

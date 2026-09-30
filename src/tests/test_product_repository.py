@@ -20,9 +20,9 @@ def db():
     session.close()
 
 
-def make_user(db, username="juan", email="juan@gmail.com"):
+def make_user(db, club="juan", email="juan@gmail.com"):
     return repo.create_user(
-        db, username=username, name="Juan",
+        db, club=club, name="Juan",
         email=email, password_hash="hash", avatar=None,
     )
 
@@ -34,17 +34,17 @@ def test_create_user_lo_guarda(db):
 
 def test_get_user_by_email(db):
     make_user(db)
-    assert repo.get_user_by_email(db, email="juan@gmail.com").username == "juan"
+    assert repo.get_user_by_email(db, email="juan@gmail.com").club == "juan"
     assert repo.get_user_by_email(db, email="nadie@gmail.com") is None
 
 
-def test_get_user_by_username(db):
+def test_get_user_by_club(db):
     make_user(db)
-    assert repo.get_user_by_username(db, username="juan").email == "juan@gmail.com"
-    assert repo.get_user_by_username(db, username="nadie") is None
+    assert repo.get_user_by_club(db, club="juan").email == "juan@gmail.com"
+    assert repo.get_user_by_club(db, club="nadie") is None
 
 
 def test_create_user_duplicado_lanza_integrity_error(db):
     make_user(db)
     with pytest.raises(IntegrityError):
-        make_user(db, username="otro", email="juan@gmail.com")   # mismo email
+        make_user(db, club="otro", email="juan@gmail.com")   # mismo email

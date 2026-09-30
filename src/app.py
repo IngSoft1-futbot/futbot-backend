@@ -38,10 +38,10 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already in use.",
         )
-    except schemas.UsernameAlreadyExistsError:
+    except schemas.ClubAlreadyExistsError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already in use.",
+            detail="Club already in use.",
         )
     except schemas.PasswordValidationError as e:
         raise HTTPException(

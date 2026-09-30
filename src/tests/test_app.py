@@ -7,7 +7,7 @@ import pytest
 from src import schemas
 
 VALID = {
-    "username": "juan",
+    "club": "juan",
     "name": "Juan Perez",
     "email": "juan@gmail.com",
     "password": "Clave123!",
@@ -16,7 +16,7 @@ VALID = {
 
 FAKE_USER = {
     "id": 1,
-    "username": "juan",
+    "club": "juan",
     "name": "Juan Perez",
     "email": "juan@gmail.com",
     "avatar": "avatar1",
@@ -42,7 +42,7 @@ def test_register_ok(client, utils_mock):
 
     assert r.status_code == 201
     body = r.json()
-    assert body["username"] == "juan"
+    assert body["club"] == "juan"
     assert "password" not in body
     assert "password_hash" not in body
     utils_mock.register_user.assert_called_once()
@@ -66,13 +66,13 @@ def test_register_email_duplicado(client, utils_mock):
     assert r.json()["detail"] == "Email already in use."
 
 
-def test_register_username_duplicado(client, utils_mock):
-    utils_mock.register_user.side_effect = schemas.UsernameAlreadyExistsError
+def test_register_club_duplicado(client, utils_mock):
+    utils_mock.register_user.side_effect = schemas.ClubAlreadyExistsError
 
     r = client.post("/auth/register", json=VALID)
 
     assert r.status_code == 400
-    assert r.json()["detail"] == "Username already in use."
+    assert r.json()["detail"] == "Club already in use."
 
 
 def test_register_password_invalida(client, utils_mock):
@@ -95,7 +95,7 @@ def test_register_conflicto_concurrente(client, utils_mock):
     assert r.json()["detail"] == "Conflict in register time."
 
 
-@pytest.mark.parametrize("campo", ["username", "name", "email", "password"])
+@pytest.mark.parametrize("campo", ["club", "name", "email", "password"])
 def test_register_falta_campo_obligatorio(client, utils_mock, campo):
     body = {k: v for k, v in VALID.items() if k != campo}
 
