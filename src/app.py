@@ -14,7 +14,7 @@ async def lifespan(app: FastAPI):
     yield
     # Todo lo que va después del yield corre al APAGAR (por ahora nada)
 
-app = FastAPI(title="Futbot API")
+app = FastAPI(title="Futbot API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
