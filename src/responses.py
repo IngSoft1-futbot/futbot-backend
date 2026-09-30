@@ -36,3 +36,22 @@ REGISTER_RESPONSES = {
         }
     }
 }
+
+LOGIN_RESPONSES = {
+    401: {
+        "description": "Unauthorized",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "invalid_credentials": {
+                        "summary": "Invalid email or password",
+                        "value": {
+                            "status": "401 Unauthorized",
+                            "message": "Invalid email or password."
+                        }
+                    }
+                }
+            }
+        },
+    }
+}
