@@ -52,3 +52,16 @@ Codigo	Cuando	detail
 |**test_utils.py**	           | Logica	            | Repository mockeado |
 |**test_app.py**	           | Traduccion a HTTP  | Utils mockeado      |
 |**test_product_repository.py**| Queries y unique   | SQL en memoria      |
+
+
+
+## Iniciar sesion
+`POST /auth/login/` Autentica a un usuario existente validando sus credenciales (correo electronico y contraseña) y retorna un token de acceso de tipo Bearer. Por motivos de consistencia, el correo electronico se procesa y normaliza automaticamente a minusculas antes de realizar la busqueda en la base de datos, asegurando coincidencia exacta con el registro.
+
+### Respuesta:
+| Codigo | Cuando | Detail / Mensaje |
+| :--- | :--- | :--- |
+| **200** | Login exitoso | `status: "200"`, `data: { access_token, token_type }`, `message: "Login successful."` |
+| **401** | Credenciales invalidas | `status: "401 Unauthorized"`, `message: "Invalid email or password."` |
+| **422** | Estructura invalida | Lista de errores de Pydantic |
+
