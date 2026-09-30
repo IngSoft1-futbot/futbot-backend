@@ -25,14 +25,15 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 def register_user(db: Session, user_in: schemas.UserCreate):
-    email = user_in.email.lower()
+    # valida antes de tocar la base de datos
+    password_validation(user_in.password)
 
+    email = user_in.email.lower()
     # 1. Chequeo previo (optimizacion: evita hashear si ya existe)
     if repo.get_user_by_email(db, email=email):
         raise schemas.EmailAlreadyExistsError()
     if repo.get_user_by_username(db, username=user_in.username):
         raise schemas.UsernameAlreadyExistsError()
-    password_validation(user_in.password)
     # 2. Hash (nunca se guarda la contraseña en texto plano)
     password_hash = hash_password(user_in.password)
 
