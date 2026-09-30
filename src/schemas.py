@@ -1,24 +1,36 @@
-from pydantic import BaseModel, EmailStr
+from datetime import datetime
+from typing import Optional, Annotated
+from pydantic import BaseModel, ConfigDict, EmailStr, StringConstraints
 
-class PACSS_attributes(BaseModel):
-    power : int
-    agility : int
-    control : int
-    speed : int
-    strength : int
+Club = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=50)]
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
 
-class Player(BaseModel):
-    name : str
-    shirt_numb : int
-    pacss_attributes : PACSS_attributes
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
+class UserCreate(BaseModel):
+    club: Club
+    name: Name
+    email: EmailStr
+    password: str
+    avatar: Optional[str] = None
 
-class Player_out(BaseModel):
-    player_id : int
-    name : str
-    shirt_numb : int
-    pacss_attributes : PACSS_attributes
+class UserOut(BaseModel):
+    id: int
+    club: str
+    name: str
+    email: EmailStr
+    avatar: Optional[str]
+    created_at: datetime
 
-class RequestBody(BaseModel):
-    email : str
-    password : str 
+    model_config = ConfigDict(from_attributes=True)  # permite leer desde el ORM
+
+class RegistrationError(Exception):
+    pass
+class EmailAlreadyExistsError(RegistrationError):
+    pass
+class PasswordValidationError(RegistrationError):
+    pass
+class ClubAlreadyExistsError(RegistrationError):
+    pass
