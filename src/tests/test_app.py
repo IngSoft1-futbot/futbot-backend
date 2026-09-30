@@ -111,9 +111,7 @@ def test_register_email_con_formato_invalido(client, utils_mock):
     assert r.status_code == 422
     utils_mock.register_user.assert_not_called()
 
-# ==========================================
-# TESTS DE LOGIN (Añadidos)
-# ==========================================
+# --------------   TESTS DE LOGIN   --------------
 
 def test_login_endpoint_exitoso(client, utils_mock):
     # Simulamos que la utilidad valida y devuelve el token de acceso

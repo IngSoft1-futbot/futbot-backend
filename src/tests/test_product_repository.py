@@ -49,10 +49,8 @@ def test_create_user_duplicado_lanza_integrity_error(db):
     with pytest.raises(IntegrityError):
         make_user(db, club="otro", email="juan@gmail.com")   # mismo email
 
-# ==========================================
-# TESTS DE LOGIN (Añadidos)
-# ==========================================
 
+# --------------   TESTS DE LOGIN   --------------
 
 def test_get_user_by_email_retorna_password_hash_para_login(db):
     # 1. Creamos un usuario de prueba

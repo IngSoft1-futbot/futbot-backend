@@ -56,9 +56,7 @@ def test_schema_no_valida_la_fuerza_de_la_password():
     assert make(password="abc").password == "abc"
 
 
-# ==========================================
-# TESTS DE LOGIN (Añadidos)
-# ==========================================
+# --------------   TESTS DE LOGIN   --------------
 
 def make_login(**over):
     data = {
