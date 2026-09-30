@@ -116,9 +116,8 @@ def test_register_email_con_formato_invalido(client, utils_mock):
 # ==========================================
 
 def test_login_endpoint_exitoso(client, utils_mock):
-    # Simulamos que authenticate_user devuelve un usuario válido
-    mock_user = type("User", (), {"email": "joaco3@gmail.com"})()
-    utils_mock.authenticate_user.return_value = mock_user
+    # Simulamos que la utilidad valida y devuelve el token de acceso
+    utils_mock.authenticate_and_create_token.return_value = "abc123token"
 
     response = client.post("/auth/login/", json={
         "email": "joaco3@gmail.com",
@@ -129,11 +128,13 @@ def test_login_endpoint_exitoso(client, utils_mock):
     data = response.json()
     assert data["message"] == "Login successful."
     assert "access_token" in data["data"]
+    assert data["data"]["access_token"] == "abc123token"
+    utils_mock.authenticate_and_create_token.assert_called_once()
 
 
 def test_login_endpoint_credenciales_invalidas(client, utils_mock):
-    # Simulamos que authenticate_user devuelve None (fallo el login)
-    utils_mock.authenticate_user.return_value = None
+    # Simulamos que la autenticación falla y devuelve None
+    utils_mock.authenticate_and_create_token.return_value = None
 
     response = client.post("/auth/login/", json={
         "email": "joaco3@gmail.com",
@@ -144,6 +145,7 @@ def test_login_endpoint_credenciales_invalidas(client, utils_mock):
     data = response.json()
     assert "message" in data
     assert data["message"] == "Invalid email or password."
+    utils_mock.authenticate_and_create_token.assert_called_once()
 
 
 def test_login_endpoint_email_invalido_por_pydantic(client, utils_mock):
@@ -154,4 +156,4 @@ def test_login_endpoint_email_invalido_por_pydantic(client, utils_mock):
     })
     
     assert response.status_code == 422
-    utils_mock.authenticate_user.assert_not_called()
+    utils_mock.authenticate_and_create_token.assert_not_called() 

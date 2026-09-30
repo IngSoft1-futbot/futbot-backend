@@ -93,9 +93,8 @@ def test_register_integrity_error_se_convierte_en_registration_error(repo_mock):
         utils.register_user(MagicMock(), USER_IN)
 
 
-# ==========================================
-# TESTS DE LOGIN (Añadidos)
-# ==========================================
+
+# --------------   TESTS DE LOGIN   --------------
 
 def test_authenticate_user_exitoso():
     # 1. Creamos un usuario "falso" que devolveria la base de datos
@@ -141,3 +140,21 @@ def test_authenticate_user_email_no_registrado():
 
         assert user is None
         mock_get.assert_called_once_with(db_session, email="noexiste@gmail.com")
+
+def test_authenticate_and_create_token_exitoso(repo_mock):
+    mock_user = MagicMock()
+    mock_user.password_hash = utils.hash_password("Pass1234!")
+
+    with patch("src.utils.authenticate_user", return_value=mock_user):
+        db_session = MagicMock()
+        token = utils.authenticate_and_create_token(db_session, email="juan@gmail.com", password="Pass1234!")
+        
+        assert token == "abc123token"
+
+
+def test_authenticate_and_create_token_falla(repo_mock):
+    with patch("src.utils.authenticate_user", return_value=None):
+        db_session = MagicMock()
+        token = utils.authenticate_and_create_token(db_session, email="juan@gmail.com", password="MalPassword1!")
+        
+        assert token is None
