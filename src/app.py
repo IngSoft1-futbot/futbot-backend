@@ -13,13 +13,13 @@ async def lifespan(app: FastAPI):
     # Todo lo que va antes del yield corre al ARRANCAR
     init_db()
     yield
-    # Todo lo que va después del yield corre al APAGAR (por ahora nada)
+    # Todo lo que va despues del yield corre al APAGAR (por ahora nada)
 
 app = FastAPI(title="Futbot API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # ajustá al puerto de tu React
+    allow_origins=["http://localhost:5173"],  # ajusta al puerto de tu React
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -61,13 +61,12 @@ def auth_login(email: str, password: str, db: Session = None):
         user = utils.authenticate_user(db, email=email, password=password)
         if not user:
             return None
-        return "abc123token" # Aqui luego generaras tu token real (ej. JWT)
+        return "abc123token" # Aqui luego generariamos un token real (ej. JWT)
     return None
 
 
 @app.post("/auth/login/", tags=["Login"])
 def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db)):
-    # Llama a auth_login (que puede ser reemplazada dinamicamente por el monkeypatch del test)
     token = auth_login(credentials.email, credentials.password, db)
     
     if not token:
@@ -87,10 +86,6 @@ def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db)):
         },
         "message": "Login successful."
     }
-
-
-
-    
 
 if __name__ == '__main__':
     import uvicorn
