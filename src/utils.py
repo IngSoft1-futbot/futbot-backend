@@ -66,3 +66,12 @@ def authenticate_user(db: Session, email: str, password: str):
 
     return user
 
+
+def authenticate_and_create_token(db, email: str, password: str):
+    # 1. Usamos la función que verifica email y contraseña (bcrypt)
+    user = authenticate_user(db, email=email, password=password)
+    if not user:
+        return None
+    
+    # 2. Si es válido, retornamos el token (por ahora simulado, luego JWT)
+    return "abc123token"

@@ -55,19 +55,10 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Conflict in register time.",
         )
 
-def auth_login(email: str, password: str, db: Session = None):
-    # Logica real usando utils (si no esta mockeada por pytest)
-    if db:
-        user = utils.authenticate_user(db, email=email, password=password)
-        if not user:
-            return None
-        return "abc123token" # Aqui luego generariamos un token real (ej. JWT)
-    return None
-
-
-@app.post("/auth/login/", tags=["Login"])
+@app.post("/auth/login/", tags=["Login"], responses=responses.LOGIN_RESPONSES) # Opcional: sumando responses para Swagger
 def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db)):
-    token = auth_login(credentials.email, credentials.password, db)
+    # Delegamos la autenticación y la generación del token a la capa de utils
+    token = utils.authenticate_and_create_token(db, email=credentials.email, password=credentials.password)
     
     if not token:
         return JSONResponse(
