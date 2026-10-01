@@ -5,22 +5,22 @@ from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy import select
-from .models import Users
+from .models import User
 from .utils import hash_password
 
-def get_user_by_email(db: Session, *, email: str) -> Optional[Users]:
+def get_user_by_email(db: Session, *, email: str) -> Optional[User]:
     return (
-        db.query(Users)
-        .filter(Users.email == email)
+        db.query(User)
+        .filter(User.email == email)
         .first()
     )
 
 def get_user_by_club(
     db: Session, *, club: str
-) -> Optional[Users]:
+) -> Optional[User]:
     return (
-        db.query(Users)
-        .filter(Users.club == club)
+        db.query(User)
+        .filter(User.club == club)
         .first()
     )
 
@@ -32,8 +32,8 @@ def create_user(
     email: str,
     password_hash: str,
     avatar: Optional[str],
-) -> Users:
-    user = Users(
+) -> User:
+    user = User(
         club=club,
         name=name,
         email=email,
@@ -53,7 +53,7 @@ def create_user(
 
 def auth_login(db : Session, email: str, password: str) -> Optional[str]:
 
-    stmt = select(Users).where(Users.email == email)
+    stmt = select(User).where(User.email == email)
     
 
     user = db.scalar(stmt)
@@ -69,7 +69,7 @@ def auth_login(db : Session, email: str, password: str) -> Optional[str]:
 
 def create_player(db:Session ,user_id: int, player: PlayerIn) -> PlayerOut:
 
-    user: Any | None = db.get(Users, user_id)
+    user: Any | None = db.get(User, user_id)
 
     if user is None:
         return None
