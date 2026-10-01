@@ -1,16 +1,14 @@
 import os
 import jwt
-from datetime import datetime, timedelta
 import bcrypt
-import secrets
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import product_repository as repo
 from . import schemas
 
-SECRET_KEY = os.getenv("SECRET_KEY", "3dc08a40cc861ea544923b397ae82bb24d54ea9d19459eb3fd8facb418cec03a")
-ALGORITHM = "HS256"
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 def password_validation(password: str):
     if len(password) < 8 or len(password) > 12:
@@ -77,7 +75,6 @@ def create_jwt_token(user_id: int) -> str:
     # Definimos el payload con el ID del usuario ("sub") y expiración de 24 horas
     payload = {
         "sub": str(user_id),
-        "exp": datetime.utcnow() + timedelta(hours=24)
     }
     # Firmamos y retornamos el token JWT
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -103,7 +100,6 @@ def verify_jwt_token(token: str) -> int:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
         return user_id
-    except jwt.ExpiredSignatureError:
-        raise schemas.TokenExpiredError("El token ha expirado.")
     except jwt.PyJWTError:
-        raise schemas.InvalidTokenError("Token invalido o no se pudo validar.")
+        raise schemas.InvalidTokenError("User not authoriced.")
+
