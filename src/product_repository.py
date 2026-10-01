@@ -1,6 +1,6 @@
 from typing import Any
 import secrets
-from .schemas import PlayerIn, Player, Player_out, PACSS_attributes
+from .schemas import PlayerIn, PlayerOut, PacssAttributes
 from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -67,7 +67,7 @@ def auth_login(db : Session, email: str, password: str) -> Optional[str]:
     return secrets.token_urlsafe(32)
 
 
-def create_player(db:Session ,user_id: int, player: PlayerIn) -> Player_out:
+def create_player(db:Session ,user_id: int, player: PlayerIn) -> PlayerOut:
 
     user: Any | None = db.get(Users, user_id)
 
@@ -76,26 +76,28 @@ def create_player(db:Session ,user_id: int, player: PlayerIn) -> Player_out:
 
     user.numb_players += 1
 
-    p = Player(
+    p = PlayerIn(
         name=player.name,
         user_id=user_id,
         shirt_numb=player.shirt_numb,
-        power=player.pacss_attributes.power,
-        agility=player.pacss_attributes.agility,
-        control=player.pacss_attributes.control,
-        speed=player.pacss_attributes.speed,
-        strength=player.pacss_attributes.strength
+        pacss_attributes=PacssAttributes(
+            power=player.pacss_attributes.power,
+            agility=player.pacss_attributes.agility,
+            control=player.pacss_attributes.control,
+            speed=player.pacss_attributes.speed,
+            strength=player.pacss_attributes.strength
+        )
     )
 
     db.add(p)
     db.commit()
     db.refresh(p)
 
-    return Player_out(
+    return PlayerOut(
         player_id=p.player_id,
         name=p.name,
         shirt_numb=p.shirt_numb,
-        pacss_attributes=PACSS_attributes(
+        pacss_attributes=PacssAttributes(
             power=p.power,
             agility=p.agility,
             control=p.control,
