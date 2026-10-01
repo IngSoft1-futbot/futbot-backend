@@ -140,6 +140,51 @@ def test_register_email_con_formato_invalido(client, utils_mock):
     assert r.status_code == 422
     utils_mock.register_user.assert_not_called()
 
+# --------------   TESTS DE LOGIN   --------------
+
+def test_login_endpoint_exitoso(client, utils_mock):
+    # Simulamos que la utilidad valida y devuelve el token de acceso
+    utils_mock.authenticate_and_create_token.return_value = "abc123token"
+
+    response = client.post("/auth/login/", json={
+        "email": "joaco3@gmail.com",
+        "password": "Pass1234!"
+    })
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message"] == "Login successful."
+    assert "access_token" in data["data"]
+    assert data["data"]["access_token"] == "abc123token"
+    utils_mock.authenticate_and_create_token.assert_called_once()
+
+
+def test_login_endpoint_credenciales_invalidas(client, utils_mock):
+    # Simulamos que la autenticación falla y devuelve None
+    utils_mock.authenticate_and_create_token.return_value = None
+
+    response = client.post("/auth/login/", json={
+        "email": "joaco3@gmail.com",
+        "password": "PasswordMala1!"
+    })
+    
+    assert response.status_code == 401
+    data = response.json()
+    assert "message" in data
+    assert data["message"] == "Invalid email or password."
+    utils_mock.authenticate_and_create_token.assert_called_once()
+
+
+def test_login_endpoint_email_invalido_por_pydantic(client, utils_mock):
+    # Aca no hace falta mockear nada porque Pydantic frena la peticion antes
+    response = client.post("/auth/login/", json={
+        "email": "correoInvalidoSinArroba",
+        "password": "Pass1234!"
+    })
+    
+    assert response.status_code == 422
+    utils_mock.authenticate_and_create_token.assert_not_called()
+    
 #------------------------------------------Crear Equipo------------------------------------------
 
 def test_create_team_ok(client, utils_mock):

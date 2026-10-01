@@ -1,5 +1,7 @@
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
@@ -40,6 +42,26 @@ def health_check(db: Session = Depends(get_db)):
         )
     return {"status": "ok", "database": "online"}
  
+
+# Configuracion de seguridad para extraer el token Bearer del header
+security = HTTPBearer()
+
+security_optional = HTTPBearer(auto_error=False)
+
+#Funcion de seguridad para proteger rutas privadas.Extrae el token Bearer del header de la peticion, lo valida utilizando la capa de utilidades y retorna el ID del usuario si es legitimo
+def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
+    """
+    Dependencia de FastAPI para proteger rutas. 
+    Intercepta el token, lo valida usando utils y devuelve el id del usuario.
+    """
+    try:
+        return utils.verify_jwt_token(credentials.credentials)
+    except schemas.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials."
+        )
+
 @app.post(
     "/auth/register",
     response_model=schemas.UserOut,
@@ -70,7 +92,48 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_409_CONFLICT,
             detail="Conflict in register time.",
         )
+
+@app.post("/auth/login/", tags=["Login"], responses=responses.LOGIN_RESPONSES) 
+def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_header: HTTPAuthorizationCredentials | None = Depends(security_optional)):
+
+    if auth_header:
+        try: 
+            utils.verify_jwt_token(auth_header.credentials)
+            # Si pasa sin errores, significa que el token es VALIDO y ACTIVO ppor lo que el usuario ya tiene un token
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ya posees un token activo. No puedes volver a iniciar sesion."
+            )
+        except schemas.InvalidTokenError:
+            # Si mandan un token corrupto o inventado, cortamos con unauthorized
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token."
+            )
+
+
+    # Delegamos la autenticacion y la generacion del token a la capa de utils
+    token = utils.authenticate_and_create_token(db, email=credentials.email, password=credentials.password)
     
+    if not token:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={
+                "status": "401 Unauthorized",
+                "message": "Invalid email or password."
+            }
+        )
+    
+    return {
+        "status": "200",
+        "data": {
+            "access_token": token,
+            "token_type": "bearer"
+        },
+        "message": "Login successful."
+    }
+
+
 @app.post(
     "/users/{user_id}/teams",
     response_model=schemas.TeamOut,
@@ -131,3 +194,4 @@ def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depend
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='0.0.0.0', port=8000)
+

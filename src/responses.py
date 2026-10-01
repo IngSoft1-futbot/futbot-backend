@@ -37,6 +37,7 @@ REGISTER_RESPONSES = {
     }
 }
 
+
 CREATE_TEAM_RESPONSES = {
     400: {
         "description": "Bad request",
@@ -98,16 +99,35 @@ CREATE_TEAM_RESPONSES = {
         }
     },
     409: {
-            "description": "Conflict",
-            "content": {
-                "application/json": {
-                    "examples": {
-                        "conflict": {
-                            "summary": "Conflict in creation time",
-                            "value": {"detail": "Conflict in creation time."},
+        "description": "Conflict",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "conflict": {
+                        "summary": "Conflict in creation time",
+                        "value": {"detail": "Conflict in creation time."},
+                    }
+                }
+            }
+        }
+    }
+}
+
+LOGIN_RESPONSES = {
+    401: {
+        "description": "Unauthorized",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "invalid_credentials": {
+                        "summary": "Invalid email or password",
+                        "value": {
+                            "status": "401 Unauthorized",
+                            "message": "Invalid email or password."
                         }
                     }
                 }
             }
         }
+    }
 }
