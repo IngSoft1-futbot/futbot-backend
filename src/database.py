@@ -3,7 +3,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from .models import Base
+from .models import Base, Behavior
 
 # Direccion de la base. Se lee de una variable de entorno para no dejar la
 # contraseña escrita en el codigo. El valor por defecto es solo para desarrollo local.
@@ -26,8 +26,22 @@ def get_db():
         yield db
     finally:
         db.close()
+        
+def seed_default_behavior(db) -> None:
+    """Crea el behavior por defecto (id 0) si todavía no existe."""
+    if db.get(Behavior, 0) is None:
+        db.add(Behavior(
+            id_behavior=0,
+            creator_id=None,          # es del sistema, no de un usuario
+            name="Default",
+            python_code="# default behavior",
+            is_default=True,
+        ))
+        db.commit()
 
 
 def init_db():
-    """Crea en Postgres las tablas definidas en models.py que todavia no existan."""
+    """Crea las tablas que falten y siembra los datos base."""
     Base.metadata.create_all(bind=engine)
+    with SessionLocal() as db:
+        seed_default_behavior(db)
