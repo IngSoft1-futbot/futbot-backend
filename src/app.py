@@ -28,6 +28,8 @@ app.add_middleware(
 # Configuracion de seguridad para extraer el token Bearer del header
 security = HTTPBearer()
 
+security_optional = HTTPBearer(auto_error=False)
+
 #Funcion de seguridad para proteger rutas privadas.Extrae el token Bearer del header de la peticion, lo valida utilizando la capa de utilidades y retorna el ID del usuario si es legitimo
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
     """
@@ -36,11 +38,6 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
     """
     try:
         return utils.verify_jwt_token(credentials.credentials)
-    except schemas.TokenExpiredError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired."
-        )
     except schemas.InvalidTokenError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -78,9 +75,26 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Conflict in register time.",
         )
 
-@app.post("/auth/login/", tags=["Login"], responses=responses.LOGIN_RESPONSES) # Opcional: sumando responses para Swagger
-def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db)):
-    # Delegamos la autenticación y la generación del token a la capa de utils
+@app.post("/auth/login/", tags=["Login"], responses=responses.LOGIN_RESPONSES) 
+def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_header: HTTPAuthorizationCredentials | None = Depends(security_optional)):
+
+    if auth_header:
+        try: 
+            utils.verify_jwt_token(auth_header.credentials)
+            # Si pasa sin errores, significa que el token es VALIDO y ACTIVO ppor lo que el usuario ya tiene un token
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ya posees un token activo. No puedes volver a iniciar sesion."
+            )
+        except schemas.InvalidTokenError:
+            # Si mandan un token corrupto o inventado, cortamos con unauthorized
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token."
+            )
+
+
+    # Delegamos la autenticacion y la generacion del token a la capa de utils
     token = utils.authenticate_and_create_token(db, email=credentials.email, password=credentials.password)
     
     if not token:
