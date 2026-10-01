@@ -58,6 +58,9 @@ Codigo	Cuando	detail
 ## Iniciar sesion
 `POST /auth/login/` Autentica a un usuario existente validando sus credenciales (correo electronico y contraseña) y retorna un token de acceso de tipo Bearer. Por motivos de consistencia, el correo electronico se procesa y normaliza automaticamente a minusculas antes de realizar la busqueda en la base de datos, asegurando coincidencia exacta con el registro.
 
+Para utilizar la funcion get_current_user_id en cualquier otro endpoint de el proyecto que requiera autenticacion, tienen que inyectarla como una dependencia de FastAPI usando Depends(), como parametro dentro de la definicion de la funcion del endpoint
+Ejemplo: current_user_id: int = Depends(get_current_user_id)
+
 ### Respuesta:
 | Codigo | Cuando | Detail / Mensaje |
 | :--- | :--- | :--- |
