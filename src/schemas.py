@@ -5,6 +5,10 @@ from pydantic import BaseModel, ConfigDict, EmailStr, StringConstraints
 Club = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=50)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
 
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
 class UserCreate(BaseModel):
     club: Club
     name: Name
@@ -29,4 +33,8 @@ class EmailAlreadyExistsError(RegistrationError):
 class PasswordValidationError(RegistrationError):
     pass
 class ClubAlreadyExistsError(RegistrationError):
+    pass
+class TokenError(Exception):
+    pass
+class InvalidTokenError(TokenError):
     pass

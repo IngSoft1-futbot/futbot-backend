@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
-
 import pytest
+import jwt
 from sqlalchemy.exc import IntegrityError
 
 from src import schemas, utils
@@ -92,3 +92,73 @@ def test_register_integrity_error_se_convierte_en_registration_error(repo_mock):
 
     with pytest.raises(schemas.RegistrationError):
         utils.register_user(MagicMock(), USER_IN)
+
+
+
+# --------------   TESTS DE LOGIN   --------------
+
+def test_authenticate_user_exitoso():
+    # 1. Creamos un usuario "falso" que devolveria la base de datos
+    mock_user = MagicMock()
+    mock_user.email = "juan@gmail.com"
+    # Hasheamos una contraseña de prueba para que bcrypt.checkpw de True
+    mock_user.password_hash = utils.hash_password("Pass1234!")
+
+    # 2. Mockeamos el repositorio para que devuelva nuestro usuario falso cuando busquen por mail
+    with patch("src.utils.repo.get_user_by_email", return_value=mock_user) as mock_get:
+        db_session = MagicMock() # Mock de la sesion de base de datos
+        
+        # Ejecutamos la funcion de autenticacion con contraseña correcta
+        user = utils.authenticate_user(db_session, email="juan@gmail.com", password="Pass1234!")
+
+        # Verificaciones
+        assert user is not None
+        assert user.email == "juan@gmail.com"
+        mock_get.assert_called_once_with(db_session, email="juan@gmail.com")
+
+
+def test_authenticate_user_password_incorrecta():
+    mock_user = MagicMock()
+    mock_user.email = "juan@gmail.com"
+    mock_user.password_hash = utils.hash_password("Pass1234!")
+
+    with patch("src.utils.repo.get_user_by_email", return_value=mock_user):
+        db_session = MagicMock()
+        
+        # Ejecutamos con contraseña INCORRECTA
+        user = utils.authenticate_user(db_session, email="juan@gmail.com", password="ClaveFalsa1!")
+
+        # Deberia fallar la verificacion de bcrypt 
+        assert user is None
+
+
+def test_authenticate_user_email_no_registrado():
+    # Mockeamos el repositorio para que devuelva None (usuario no encontrado)
+    with patch("src.utils.repo.get_user_by_email", return_value=None) as mock_get:
+        db_session = MagicMock()
+        
+        user = utils.authenticate_user(db_session, email="noexiste@gmail.com", password="Pass1234!")
+
+        assert user is None
+        mock_get.assert_called_once_with(db_session, email="noexiste@gmail.com")
+
+def test_authenticate_and_create_token_exitoso(repo_mock):
+    mock_user = MagicMock()
+    mock_user.id = 1
+    mock_user.password_hash = utils.hash_password("Pass1234!")
+
+    with patch("src.utils.authenticate_user", return_value=mock_user):
+        db_session = MagicMock()
+        token = utils.authenticate_and_create_token(db_session, email="juan@gmail.com", password="Pass1234!")
+        
+        # Decodificamos el token generado para verificar que el payload sea correcto
+        payload = jwt.decode(token, options={"verify_signature": False}) 
+        assert payload["sub"] == str(mock_user.id)
+
+
+def test_authenticate_and_create_token_falla(repo_mock):
+    with patch("src.utils.authenticate_user", return_value=None):
+        db_session = MagicMock()
+        token = utils.authenticate_and_create_token(db_session, email="juan@gmail.com", password="MalPassword1!")
+        
+        assert token is None

@@ -1,9 +1,14 @@
+import os
+import jwt
 import bcrypt
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import product_repository as repo
 from . import schemas
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 def password_validation(password: str):
     if len(password) < 8 or len(password) > 12:
@@ -47,3 +52,54 @@ def register_user(db: Session, user_in: schemas.UserCreate):
         )
     except IntegrityError:
         raise schemas.RegistrationError()
+
+def authenticate_user(db: Session, email: str, password: str):
+    # 1. Buscar al usuario por email (normalizado en minusculas)
+    user = repo.get_user_by_email(db, email=email.lower())
+    if not user:
+        return None # podes lanzar una excepcion personalizada de credenciales invalidas
+
+    # 2. Verificar la contraseña usando bcrypt
+    # bcrypt.checkpw requiere bytes, por eso codificamos ambos
+    is_valid = bcrypt.checkpw(
+        password.encode("utf-8"), 
+        user.password_hash.encode("utf-8")
+    )
+    
+    if not is_valid:
+        return None
+
+    return user
+
+def create_jwt_token(user_id: int) -> str:
+    # Definimos el payload con el ID del usuario ("sub") y expiración de 24 horas
+    payload = {
+        "sub": str(user_id),
+    }
+    # Firmamos y retornamos el token JWT
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return token
+
+
+def authenticate_and_create_token(db, email: str, password: str):
+    # 1. Usamos la funcion que verifica email y contraseña (bcrypt)
+    user = authenticate_user(db, email=email, password=password)
+    if not user:
+        return None
+
+    # 2. Si las credenciales son validas, generamos y retornamos el JWT firmado 
+    return create_jwt_token(user.id)
+
+
+def verify_jwt_token(token: str) -> int:
+    """
+    Decodifica y valida el token JWT. 
+    Retorna el user_id si es valido, o lanza excepciones si expiro o es invalido.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(payload.get("sub"))
+        return user_id
+    except jwt.PyJWTError:
+        raise schemas.InvalidTokenError("User not authoriced.")
+

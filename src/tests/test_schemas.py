@@ -54,3 +54,36 @@ def test_falta_password():
 def test_schema_no_valida_la_fuerza_de_la_password():
     # Es responsabilidad de utils.password_validation, no de Pydantic
     assert make(password="abc").password == "abc"
+
+
+# --------------   TESTS DE LOGIN   --------------
+
+def make_login(**over):
+    data = {
+        "email": "joaco2@gmail.com",
+        "password": "Pass1234!",
+    }
+    data.update(over)
+    return schemas.LoginRequest(**data)
+
+
+def test_login_valido():
+    login_data = make_login()
+    assert login_data.email == "joaco2@gmail.com"
+    assert login_data.password == "Pass1234!"
+
+
+@pytest.mark.parametrize("email", ["hola", "a@", "@gmail.com", "correoSinArroba"])
+def test_login_email_invalido(email):
+    with pytest.raises(ValidationError):
+        make_login(email=email)
+
+
+def test_login_falta_email():
+    with pytest.raises(ValidationError):
+        schemas.LoginRequest(password="Pass1234!")
+
+
+def test_login_falta_password():
+    with pytest.raises(ValidationError):
+        schemas.LoginRequest(email="joaco2@gmail.com")
