@@ -20,7 +20,7 @@ help: ## Muestra esta ayuda
 
 install: ## Crea el venv (si no existe) e instala dependencias
 	test -d $(VENV) || python3 -m venv $(VENV)
-	$(PIP) install fastapi uvicorn sqlalchemy psycopg2-binary email-validator bcrypt pytest httpx2
+	$(PIP) install fastapi uvicorn sqlalchemy psycopg2-binary email-validator bcrypt pytest httpx2 PyJWT
 
 db: ## Levanta el contenedor de Postgres (lo crea si no existe)
 	@docker start $(DB_CONTAINER) >/dev/null 2>&1 || \
