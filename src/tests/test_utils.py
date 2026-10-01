@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock, patch
 import pytest
+import jwt
 from sqlalchemy.exc import IntegrityError
 
 from src import schemas, utils
@@ -143,13 +144,16 @@ def test_authenticate_user_email_no_registrado():
 
 def test_authenticate_and_create_token_exitoso(repo_mock):
     mock_user = MagicMock()
+    mock_user.id = 1
     mock_user.password_hash = utils.hash_password("Pass1234!")
 
     with patch("src.utils.authenticate_user", return_value=mock_user):
         db_session = MagicMock()
         token = utils.authenticate_and_create_token(db_session, email="juan@gmail.com", password="Pass1234!")
         
-        assert token == "abc123token"
+        # Decodificamos el token generado para verificar que el payload sea correcto
+        payload = jwt.decode(token, options={"verify_signature": False}) 
+        assert payload["sub"] == str(mock_user.id)
 
 
 def test_authenticate_and_create_token_falla(repo_mock):
