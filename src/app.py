@@ -1,6 +1,8 @@
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 from contextlib import asynccontextmanager
 
 from . import schemas, utils, responses
@@ -9,20 +11,35 @@ from .database import get_db, init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Todo lo que va antes del yield corre al ARRANCAR
-    init_db()
+    try: # Antes del yield: corre al ARRANCAR (crea tablas y siembra el behavior 0)
+        init_db()
+    except SQLAlchemyError:
+        print("WARNING: database not available")
     yield
-    # Todo lo que va después del yield corre al APAGAR (por ahora nada)
-
-app = FastAPI(title="Futbot API")
-
+    # Despues del yield: corre al APAGAR (por ahora nada)
+ 
+ 
+app = FastAPI(title="Futbot API", lifespan=lifespan)
+ 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # ajustá al puerto de tu React
+    allow_origins=["http://localhost:5173"],  # ajustar al puerto del React
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+ 
+ 
+@app.get("/health", tags=["health"])
+def health_check(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable.",
+        )
+    return {"status": "ok", "database": "online"}
+ 
 @app.post(
     "/auth/register",
     response_model=schemas.UserOut,
@@ -52,6 +69,63 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Conflict in register time.",
+        )
+    
+@app.post(
+    "/users/{user_id}/teams",
+    response_model=schemas.TeamOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Teams"],
+    responses=responses.CREATE_TEAM_RESPONSES
+)
+def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depends(get_db)):
+    #aqui necesitamos verificacion de autenticidad
+    try:
+        return utils.create_team(db, user_id, team_in)
+    except schemas.UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User can not find."
+        )
+    except schemas.PlayerNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player can not find."
+        )
+    except schemas.BehaviorNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Behavior can not find."
+        )
+    except schemas.PlayerNotAuthorizedError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not the owner of the player."
+        )
+    except schemas.BehaviorNotAuthorizedError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not the owner of the behavior."
+        )
+    except schemas.TeamNameAlreadyInUseError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= "Team name already in use for this user."
+        )
+    except schemas.TeamIncompleteError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= "Team incomplete, must be 3 starters & 3 subtitutes."
+        )
+    except schemas.PlayerAlreadyInUseError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= "Some players are already in use."
+        )
+    except schemas.CreateTeamError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conflict in creation time."
         )
 
 if __name__ == '__main__':
