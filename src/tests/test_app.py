@@ -23,6 +23,35 @@ FAKE_USER = {
     "created_at": "2026-01-01T00:00:00Z",
 }
 
+TEAM_BODY = {
+    "name": "Mi Equipo",
+    "jugadores_titulares": [
+        {"player_id": 7, "behavior_id": 0},
+        {"player_id": 8, "behavior_id": 0},
+        {"player_id": 9},  # sin behavior_id -> opcional
+    ],
+    "jugadores_suplentes": [
+        {"player_id": 10, "behavior_id": 0},
+        {"player_id": 11, "behavior_id": 0},
+        {"player_id": 12, "behavior_id": 0},
+    ],
+}
+ 
+FAKE_TEAM = {
+    "team_id": 1,
+    "name": "Mi Equipo",
+    "jugadores_titulares": [
+        {"player_id": 7, "name": "Lionel Messi", "behavior_id": 0},
+        {"player_id": 8, "name": "Cristiano Ronaldo", "behavior_id": 0},
+        {"player_id": 9, "name": "Erling Haaland", "behavior_id": 0},
+    ],
+    "jugadores_suplentes": [
+        {"player_id": 10, "name": "Kevin De Bruyne", "behavior_id": 0},
+        {"player_id": 11, "name": "Virgil van Dijk", "behavior_id": 0},
+        {"player_id": 12, "name": "Emiliano Martinez", "behavior_id": 0},
+    ],
+}
+
 @pytest.fixture
 def client():
     app.dependency_overrides[get_db] = lambda: MagicMock()
@@ -110,3 +139,111 @@ def test_register_email_con_formato_invalido(client, utils_mock):
 
     assert r.status_code == 422
     utils_mock.register_user.assert_not_called()
+
+#------------------------------------------Crear Equipo------------------------------------------
+
+def test_create_team_ok(client, utils_mock):
+    utils_mock.create_team.return_value = FAKE_TEAM
+ 
+    r = client.post("/users/1/teams", json=TEAM_BODY)
+ 
+    assert r.status_code == 201
+    body = r.json()
+    assert body["team_id"] == 1
+    assert body["name"] == "Mi Equipo"
+    assert len(body["jugadores_titulares"]) == 3
+    assert len(body["jugadores_suplentes"]) == 3
+    utils_mock.create_team.assert_called_once()
+ 
+ 
+def test_create_team_pasa_user_id_y_schema_a_utils(client, utils_mock):
+    utils_mock.create_team.return_value = FAKE_TEAM
+ 
+    client.post("/users/42/teams", json=TEAM_BODY)
+ 
+    _, user_id, team_in = utils_mock.create_team.call_args.args
+    assert user_id == 42
+    assert isinstance(team_in, schemas.TeamCreate)
+    assert team_in.name == "Mi Equipo"
+    assert team_in.jugadores_titulares[2].behavior_id is None  # default
+ 
+ 
+def test_create_team_sin_suplentes_usa_lista_vacia(client, utils_mock):
+    utils_mock.create_team.return_value = FAKE_TEAM
+    body = {k: v for k, v in TEAM_BODY.items() if k != "jugadores_suplentes"}
+ 
+    r = client.post("/users/1/teams", json=body)
+ 
+    assert r.status_code == 201
+    _, _, team_in = utils_mock.create_team.call_args.args
+    assert team_in.jugadores_suplentes == []
+ 
+ 
+def test_create_team_nombre_se_recorta(client, utils_mock):
+    utils_mock.create_team.return_value = FAKE_TEAM
+ 
+    client.post("/users/1/teams", json={**TEAM_BODY, "name": "  Mi Equipo  "})
+ 
+    _, _, team_in = utils_mock.create_team.call_args.args
+    assert team_in.name == "Mi Equipo"
+ 
+ 
+@pytest.mark.parametrize(
+    "error, status_code, detail",
+    [
+        (schemas.UserNotFoundError, 404, "User can not find."),
+        (schemas.PlayerNotFoundError, 404, "Player can not find."),
+        (schemas.BehaviorNotFoundError, 404, "Behavior can not find."),
+        (schemas.PlayerNotAuthorizedError, 403, "User is not the owner of the player."),
+        (schemas.BehaviorNotAuthorizedError, 403, "User is not the owner of the behavior."),
+        (schemas.TeamNameAlreadyInUseError, 400, "Team name already in use for this user."),
+        (schemas.TeamIncompleteError, 400, "Team incomplete, must be 3 starters & 3 subtitutes."),
+        (schemas.PlayerAlreadyInUseError, 400, "Some players are already in use."),
+        (schemas.CreateTeamError, 409, "Conflict in creation time."),
+    ],
+)
+def test_create_team_errores_de_negocio(client, utils_mock, error, status_code, detail):
+    utils_mock.create_team.side_effect = error
+ 
+    r = client.post("/users/1/teams", json=TEAM_BODY)
+ 
+    assert r.status_code == status_code
+    assert r.json()["detail"] == detail
+ 
+ 
+@pytest.mark.parametrize("campo", ["name", "jugadores_titulares"])
+def test_create_team_falta_campo_obligatorio(client, utils_mock, campo):
+    body = {k: v for k, v in TEAM_BODY.items() if k != campo}
+ 
+    r = client.post("/users/1/teams", json=body)
+ 
+    assert r.status_code == 422
+    utils_mock.create_team.assert_not_called()
+ 
+ 
+@pytest.mark.parametrize("nombre", ["ab", "x" * 31, "   "])
+def test_create_team_nombre_invalido(client, utils_mock, nombre):
+    r = client.post("/users/1/teams", json={**TEAM_BODY, "name": nombre})
+ 
+    assert r.status_code == 422
+    utils_mock.create_team.assert_not_called()
+ 
+ 
+def test_create_team_user_id_no_numerico(client, utils_mock):
+    r = client.post("/users/abc/teams", json=TEAM_BODY)
+ 
+    assert r.status_code == 422
+    utils_mock.create_team.assert_not_called()
+ 
+ 
+def test_create_team_player_id_invalido(client, utils_mock):
+    body = {
+        **TEAM_BODY,
+        "jugadores_titulares": [{"player_id": "no-es-un-numero"}],
+    }
+ 
+    r = client.post("/users/1/teams", json=body)
+ 
+    assert r.status_code == 422
+    utils_mock.create_team.assert_not_called()
+ 
