@@ -46,12 +46,11 @@ class ClubAlreadyExistsError(RegistrationError):
 """ PacssAttributes Schema """
 
 class PacssAttributes(BaseModel):
-    id: int
     power: int
     agility: int
     control: int
     speed: int
-    strenght: int
+    strength: int
 
 class PointAssignmentError(Exception):
     pass  # {HTTPERROR} 400
@@ -67,14 +66,14 @@ class PointDeficiencyError(PointAssignmentError):
 
 class PlayerIn(BaseModel):
     name: str
-    shirt_numb: Optional[int] = None
+    shirt_number: Optional[int] = None
     pacss_attributes: PacssAttributes
     team_id: Optional[int] = None
 
 class PlayerOut(BaseModel):
     player_id: int
     name: str
-    shirt_numb: Optional[int] = None
+    shirt_number: Optional[int] = None
     pacss_attributes: PacssAttributes
     team_id: Optional[int] = None
     
