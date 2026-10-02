@@ -74,7 +74,7 @@ def authenticate_user(db: Session, email: str, password: str):
     return user
 
 def create_jwt_token(user_id: int) -> str:
-    # Definimos el payload con el ID del usuario ("sub") y expiración de 24 horas
+    # Definimos el payload con el ID del usuario ("sub")
     payload = {
         "sub": str(user_id),
     }
@@ -167,7 +167,7 @@ def build_team_out(team) -> schemas.TeamOut:
 def create_team(db: Session, user_id: int, team_in: schemas.TeamCreate):
     # Validaciones sin base
     check_composition_and_duplicated(team_in)
- 
+    team_name= team_in.name.lower()  # normalizamos a minusculas para evitar duplicados
     # Validaciones con base
     if not repo.get_user(db, user_id):
         raise schemas.UserNotFoundError()
@@ -178,7 +178,7 @@ def create_team(db: Session, user_id: int, team_in: schemas.TeamCreate):
     check_players(db, user_id, [pid for pid, _ in starters + substitutes])
     check_behaviors(db, user_id, {bid for _, bid in starters + substitutes})
  
-    if repo.get_team_by_owner_and_name(db, owner_id=user_id, name=team_in.name.lower()):     
+    if repo.get_team_by_owner_and_name(db, owner_id=user_id, name=team_name):     
         raise schemas.TeamNameAlreadyInUseError()
  
     # Crear (el repository hace commit/rollback)
