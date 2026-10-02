@@ -1,3 +1,4 @@
+from typing import Optional
 import os
 import jwt
 import bcrypt
@@ -83,7 +84,7 @@ def create_jwt_token(user_id: int) -> str:
     return token
 
 
-def authenticate_and_create_token(db, email: str, password: str):
+def authenticate_and_create_token(db, email: str, password: str) -> Optional[str]:
     # 1. Usamos la funcion que verifica email y contraseña (bcrypt)
     user = authenticate_user(db, email=email, password=password)
     if not user:
