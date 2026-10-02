@@ -58,22 +58,7 @@ def register_user(db: Session, user_in: schemas.UserCreate):
         raise schemas.RegistrationError()
 
 
-def validate_pacss(pacss)-> bool:
-    
-    attributes: list[int] = [pacss.power, pacss.agility, pacss.control, pacss.speed, pacss.strength]
-    if not all(20 <= attr <= 100 for attr in attributes):
-        return False
 
-    if sum(attributes) != 300:
-        return False
-
-    return True
-
-def verify_player(player: PlayerIn)-> bool:
-
-    pacss: schemas.PacssAttributes = player.pacss_attributes
-
-    return validate_pacss(pacss)
 #-----------------Login-----------------------
 def authenticate_user(db: Session, email: str, password: str):
     # 1. Buscar al usuario por email (normalizado en minusculas)
@@ -124,6 +109,26 @@ def verify_jwt_token(token: str) -> int:
         return user_id
     except jwt.PyJWTError:
         raise schemas.InvalidTokenError("User not authoriced.")
+
+#-----------------Crear Jugador-----------------------
+
+
+def validate_pacss(pacss)-> bool:
+    
+    attributes: list[int] = [pacss.power, pacss.agility, pacss.control, pacss.speed, pacss.strength]
+    if not all(20 <= attr <= 100 for attr in attributes):
+        return False
+
+    if sum(attributes) != 300:
+        return False
+
+    return True
+
+def verify_player(player: PlayerIn)-> bool:
+
+    pacss: schemas.PacssAttributes = player.pacss_attributes
+
+    return validate_pacss(pacss)
 
 
 
