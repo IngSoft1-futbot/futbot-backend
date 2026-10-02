@@ -148,3 +148,72 @@ LOGIN_RESPONSES = {
         }
     }
 }
+
+CREATE_PLAYER_RESPONSES = {
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "player_incomplete": {
+                        "summary": "Player incomplete, must spend all points",
+                        "value": {"detail": "Player incomplete, must spend all points"}
+                    }
+                }
+            }
+        },
+    },
+    401: {
+    "description": "Unauthorized",
+    "content": {
+        "application/json": {
+            "examples": {
+                "invalid_token": {
+                    "summary": "Invalid or missing token",
+                    "value": {"detail": "Could not validate credentials."}
+                    }
+                }
+            }
+        }
+    },
+    403: {
+        "description": "Forbidden",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "user_not_owner": {
+                        "summary": "Not allowed to create players for another user",
+                        "value": {"detail": "Not allowed to create players for another user."}
+                    }
+                }
+            }
+        }
+    },
+    404:{
+        "description": "Not Found",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "user_not_found":{
+                        "summary": "User could not be found.",
+                        "value": {"detail": "User could not be found."}
+                    }
+                }
+            }
+        }
+    },
+    409: {
+        "description": "Conflict",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "conflict": {
+                        "summary": "Conflict in creation time",
+                        "value": {"detail": "Conflict in creation time."},
+                    }
+                }
+            }
+        }
+    }
+}
+
