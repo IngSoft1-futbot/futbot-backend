@@ -1,3 +1,4 @@
+from src import product_repository
 from fastapi.responses import JSONResponse
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -133,6 +134,28 @@ def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_
         "message": "Login successful."
     }
 
+@app.post(
+    "/users/{user_id}/players",
+    response_model=schemas.PlayerOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Players"],
+    responses=responses.CREATE_PLAYER_RESPONSES
+)
+def create_player (user_id: int, player_in: schemas.PlayerIn, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
+
+    if current_user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to players for another user.",
+        )
+    try:
+        return product_repository.create_player(db, user_id, player_in)
+    except schemas.UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User could not be found."
+        )
+    
 
 @app.post(
     "/users/{user_id}/teams",
