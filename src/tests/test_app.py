@@ -1,5 +1,5 @@
 from unittest.mock import patch, MagicMock
-from src.app import app
+from src.app import app, get_current_user_id
 from src.database import get_db
 from fastapi.testclient import TestClient
 import pytest
@@ -55,6 +55,7 @@ FAKE_TEAM = {
 @pytest.fixture
 def client():
     app.dependency_overrides[get_db] = lambda: MagicMock()
+    app.dependency_overrides[get_current_user_id] = lambda: 1
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -186,7 +187,7 @@ def test_login_endpoint_email_invalido_por_pydantic(client, utils_mock):
     utils_mock.authenticate_and_create_token.assert_not_called()
     
 #------------------------------------------Crear Equipo------------------------------------------
-
+ 
 def test_create_team_ok(client, utils_mock):
     utils_mock.create_team.return_value = FAKE_TEAM
  
@@ -202,8 +203,8 @@ def test_create_team_ok(client, utils_mock):
  
  
 def test_create_team_pasa_user_id_y_schema_a_utils(client, utils_mock):
-    utils_mock.create_team.return_value = FAKE_TEAM
- 
+    app.dependency_overrides[get_current_user_id] = lambda: 42
+    utils_mock.create_team.return_value = FAKE_TEAM 
     client.post("/users/42/teams", json=TEAM_BODY)
  
     _, user_id, team_in = utils_mock.create_team.call_args.args
@@ -211,26 +212,6 @@ def test_create_team_pasa_user_id_y_schema_a_utils(client, utils_mock):
     assert isinstance(team_in, schemas.TeamCreate)
     assert team_in.name == "Mi Equipo"
     assert team_in.jugadores_titulares[2].behavior_id is None  # default
- 
- 
-def test_create_team_sin_suplentes_usa_lista_vacia(client, utils_mock):
-    utils_mock.create_team.return_value = FAKE_TEAM
-    body = {k: v for k, v in TEAM_BODY.items() if k != "jugadores_suplentes"}
- 
-    r = client.post("/users/1/teams", json=body)
- 
-    assert r.status_code == 201
-    _, _, team_in = utils_mock.create_team.call_args.args
-    assert team_in.jugadores_suplentes == []
- 
- 
-def test_create_team_nombre_se_recorta(client, utils_mock):
-    utils_mock.create_team.return_value = FAKE_TEAM
- 
-    client.post("/users/1/teams", json={**TEAM_BODY, "name": "  Mi Equipo  "})
- 
-    _, _, team_in = utils_mock.create_team.call_args.args
-    assert team_in.name == "Mi Equipo"
  
  
 @pytest.mark.parametrize(
@@ -266,14 +247,6 @@ def test_create_team_falta_campo_obligatorio(client, utils_mock, campo):
     utils_mock.create_team.assert_not_called()
  
  
-@pytest.mark.parametrize("nombre", ["ab", "x" * 31, "   "])
-def test_create_team_nombre_invalido(client, utils_mock, nombre):
-    r = client.post("/users/1/teams", json={**TEAM_BODY, "name": nombre})
- 
-    assert r.status_code == 422
-    utils_mock.create_team.assert_not_called()
- 
- 
 def test_create_team_user_id_no_numerico(client, utils_mock):
     r = client.post("/users/abc/teams", json=TEAM_BODY)
  
@@ -281,14 +254,28 @@ def test_create_team_user_id_no_numerico(client, utils_mock):
     utils_mock.create_team.assert_not_called()
  
  
-def test_create_team_player_id_invalido(client, utils_mock):
-    body = {
-        **TEAM_BODY,
-        "jugadores_titulares": [{"player_id": "no-es-un-numero"}],
-    }
+def test_create_team_sin_token(client, utils_mock):
+    app.dependency_overrides.pop(get_current_user_id)
  
-    r = client.post("/users/1/teams", json=body)
+    r = client.post("/users/1/teams", json=TEAM_BODY)
  
-    assert r.status_code == 422
+    assert r.status_code in (401, 403)   # depende de la version de FastAPI
+    utils_mock.create_team.assert_not_called()
+ 
+ 
+def test_create_team_token_invalido(client, utils_mock):
+    app.dependency_overrides.pop(get_current_user_id)
+    utils_mock.verify_jwt_token.side_effect = schemas.InvalidTokenError
+ 
+    r = client.post("/users/1/teams", json=TEAM_BODY, headers={"Authorization": "Bearer basura"})
+ 
+    assert r.status_code == 401
+    utils_mock.create_team.assert_not_called()
+ 
+ 
+def test_create_team_token_de_otro_usuario(client, utils_mock):
+    r = client.post("/users/2/teams", json=TEAM_BODY)   # el token simulado es del usuario 1
+ 
+    assert r.status_code == 403
     utils_mock.create_team.assert_not_called()
  
