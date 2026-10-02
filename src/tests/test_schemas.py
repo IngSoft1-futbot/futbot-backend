@@ -1,6 +1,6 @@
 import pytest
 from pydantic import ValidationError
-
+from types import SimpleNamespace
 from src import schemas
 
 
@@ -87,3 +87,111 @@ def test_login_falta_email():
 def test_login_falta_password():
     with pytest.raises(ValidationError):
         schemas.LoginRequest(email="joaco2@gmail.com")
+
+# --------------   TESTS DE EQUIPOS   --------------
+ 
+TEAM = {
+    "name": "Mi Equipo",
+    "jugadores_titulares": [
+        {"player_id": 7, "behavior_id": 0},
+        {"player_id": 8},
+        {"player_id": 9},
+    ],
+    "jugadores_suplentes": [
+        {"player_id": 10},
+        {"player_id": 11},
+        {"player_id": 12},
+    ],
+}
+ 
+ 
+# ---------- PlayerAssignment ----------
+ 
+def test_player_assignment_behavior_es_opcional():
+    p = schemas.PlayerAssignment(player_id=7)
+ 
+    assert p.player_id == 7
+    assert p.behavior_id is None   # utils lo resuelve al default (0)
+ 
+ 
+def test_player_assignment_con_behavior():
+    assert schemas.PlayerAssignment(player_id=7, behavior_id=5).behavior_id == 5
+ 
+ 
+def test_player_assignment_falta_player_id():
+    with pytest.raises(ValidationError):
+        schemas.PlayerAssignment(behavior_id=5)
+ 
+ 
+@pytest.mark.parametrize("campo", ["player_id", "behavior_id"])
+def test_player_assignment_ids_no_numericos(campo):
+    with pytest.raises(ValidationError):
+        schemas.PlayerAssignment(**{"player_id": 7, "behavior_id": 5, campo: "abc"})
+ 
+ 
+# ---------- TeamCreate ----------
+ 
+def test_team_create_valido():
+    team = schemas.TeamCreate(**TEAM)
+ 
+    assert team.name == "Mi Equipo"
+    assert len(team.jugadores_titulares) == 3
+    assert len(team.jugadores_suplentes) == 3
+    assert team.jugadores_titulares[0].behavior_id == 0
+    assert team.jugadores_titulares[1].behavior_id is None
+ 
+ 
+def test_team_name_se_recorta():
+    assert schemas.TeamCreate(**{**TEAM, "name": "  Mi Equipo  "}).name == "Mi Equipo"
+ 
+ 
+@pytest.mark.parametrize("name", ["abc", "a" * 30])   # justo en los limites
+def test_team_name_limites_validos(name):
+    assert schemas.TeamCreate(**{**TEAM, "name": name}).name == name
+ 
+ 
+@pytest.mark.parametrize("name", ["", "   ", "ab", " ab ", "a" * 31])
+def test_team_name_invalido(name):
+    with pytest.raises(ValidationError):
+        schemas.TeamCreate(**{**TEAM, "name": name})
+ 
+ 
+@pytest.mark.parametrize("campo", ["name", "jugadores_titulares"])
+def test_team_create_falta_campo_obligatorio(campo):
+    data = {k: v for k, v in TEAM.items() if k != campo}
+ 
+    with pytest.raises(ValidationError):
+        schemas.TeamCreate(**data)
+ 
+ 
+def test_suplentes_es_opcional_y_queda_vacio():
+    data = {k: v for k, v in TEAM.items() if k != "jugadores_suplentes"}
+ 
+    assert schemas.TeamCreate(**data).jugadores_suplentes == []
+ 
+ 
+def test_jugador_sin_player_id_dentro_de_la_lista():
+    with pytest.raises(ValidationError):
+        schemas.TeamCreate(**{**TEAM, "jugadores_suplentes": [{}]})
+ 
+ 
+def test_schema_no_valida_la_composicion_del_equipo():
+    # El "3 titulares + 3 suplentes" se valida en utils, no en el schema
+    team = schemas.TeamCreate(name="Mi Equipo", jugadores_titulares=[{"player_id": 7}])
+ 
+    assert len(team.jugadores_titulares) == 1
+    assert team.jugadores_suplentes == []
+ 
+ 
+# ---------- PlayerOut ----------
+ 
+def test_player_out_se_construye_desde_un_objeto_orm():
+    orm_player = SimpleNamespace(
+        player_id=7, name="Lionel Messi", behavior_id=0,
+        owner_id=1, power=90, agility=95,   # atributos de mas: se ignoran
+    )
+ 
+    out = schemas.PlayerOut.model_validate(orm_player)
+ 
+    assert out.model_dump() == {"player_id": 7, "name": "Lionel Messi", "behavior_id": 0}
+ 

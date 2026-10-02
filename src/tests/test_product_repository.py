@@ -66,3 +66,207 @@ def test_get_user_by_email_retorna_password_hash_para_login(db):
     assert user is not None
     assert user.email == "login@gmail.com"
     assert user.password_hash == "password123"
+
+
+# --------------   TESTS DE CREAR EQUIPO   --------------
+ 
+def make_behavior(db, bid=0, creator_id=None, is_default=True):
+    behavior = models.Behavior(
+        id_behavior=bid, creator_id=creator_id, name=f"B{bid}",
+        python_code="# code", is_default=is_default,
+    )
+    db.add(behavior)
+    db.commit()
+    return behavior
+ 
+ 
+def make_player(db, owner_id, pid):
+    player = models.Player(
+        player_id=pid, owner_id=owner_id, shirt_number=pid, name=f"Jugador {pid}",
+        power=1, agility=1, control=1, speed=1, strength=1,
+    )
+    db.add(player)
+    db.commit()
+    return player
+ 
+ 
+@pytest.fixture
+def usuario_con_jugadores(db):
+    user = make_user(db)
+    make_behavior(db, 0)
+    make_behavior(db, 5, creator_id=user.id, is_default=False)
+    for pid in range(7, 13):
+        make_player(db, user.id, pid)
+    return user
+ 
+ 
+# ---------- get_user ----------
+ 
+def test_get_user_existente(db):
+    user = make_user(db)
+ 
+    assert repo.get_user(db, user.id).email == "juan@gmail.com"
+ 
+ 
+def test_get_user_inexistente(db):
+    assert repo.get_user(db, 999) is None
+ 
+ 
+# ---------- get_players_by_ids ----------
+ 
+def test_get_players_by_ids_devuelve_solo_los_pedidos(db, usuario_con_jugadores):
+    players = repo.get_players_by_ids(db, ids=[7, 9])
+ 
+    assert sorted(p.player_id for p in players) == [7, 9]
+ 
+ 
+def test_get_players_by_ids_ignora_los_inexistentes(db, usuario_con_jugadores):
+    players = repo.get_players_by_ids(db, ids=[7, 999])
+ 
+    assert [p.player_id for p in players] == [7]
+ 
+ 
+# ---------- get_behaviors_by_ids ----------
+ 
+def test_get_behaviors_by_ids_devuelve_solo_los_pedidos(db, usuario_con_jugadores):
+    make_behavior(db, 6, creator_id=usuario_con_jugadores.id, is_default=False)
+ 
+    behaviors = repo.get_behaviors_by_ids(db, ids=[0, 5])
+ 
+    assert sorted(b.id_behavior for b in behaviors) == [0, 5]
+ 
+ 
+def test_get_behaviors_by_ids_ignora_los_inexistentes(db, usuario_con_jugadores):
+    behaviors = repo.get_behaviors_by_ids(db, ids=[0, 999])
+ 
+    assert [b.id_behavior for b in behaviors] == [0]
+ 
+ 
+# ---------- get_team_by_owner_and_name ----------
+ 
+def test_get_team_by_owner_and_name_existente(db):
+    user = make_user(db)
+    team = repo.add_team(db, owner_id=user.id, name="Mi Equipo", starters=[], substitutes=[])
+ 
+    found = repo.get_team_by_owner_and_name(db, owner_id=user.id, name="Mi Equipo")
+ 
+    assert found.team_id == team.team_id
+ 
+ 
+def test_get_team_by_owner_and_name_de_otro_usuario(db):
+    user = make_user(db)
+    otro = make_user(db, club="pedro", email="pedro@gmail.com")
+    repo.add_team(db, owner_id=user.id, name="Mi Equipo", starters=[], substitutes=[])
+ 
+    assert repo.get_team_by_owner_and_name(db, owner_id=otro.id, name="Mi Equipo") is None
+ 
+ 
+def test_get_team_by_owner_and_name_otro_nombre(db):
+    user = make_user(db)
+    repo.add_team(db, owner_id=user.id, name="Mi Equipo", starters=[], substitutes=[])
+ 
+    assert repo.get_team_by_owner_and_name(db, owner_id=user.id, name="Otro") is None
+ 
+ 
+def test_get_team_by_owner_and_name_distingue_mayusculas(db):
+    # La busqueda es por nombre exacto: "Mi Equipo" y "mi equipo" son distintos
+    user = make_user(db)
+    repo.add_team(db, owner_id=user.id, name="Mi Equipo", starters=[], substitutes=[])
+ 
+    assert repo.get_team_by_owner_and_name(db, owner_id=user.id, name="mi equipo") is None
+ 
+ 
+# ---------- add_team ----------
+ 
+def test_add_team_crea_el_equipo(db, usuario_con_jugadores):
+    team = repo.add_team(
+        db, owner_id=usuario_con_jugadores.id, name="Mi Equipo",
+        starters=[(7, 0), (8, 0), (9, 0)],
+        substitutes=[(10, 0), (11, 0), (12, 0)],
+    )
+ 
+    assert team.team_id is not None
+    assert team.name == "Mi Equipo"
+    assert team.owner_id == usuario_con_jugadores.id
+    assert db.query(models.Team).count() == 1
+ 
+ 
+def test_add_team_asigna_el_equipo_a_los_jugadores(db, usuario_con_jugadores):
+    team = repo.add_team(
+        db, owner_id=usuario_con_jugadores.id, name="Mi Equipo",
+        starters=[(7, 0), (8, 0), (9, 0)],
+        substitutes=[(10, 0), (11, 0), (12, 0)],
+    )
+ 
+    assert all(p.team_id == team.team_id for p in db.query(models.Player).all())
+    assert len(team.players) == 6
+ 
+ 
+def test_add_team_marca_titulares_y_suplentes(db, usuario_con_jugadores):
+    repo.add_team(
+        db, owner_id=usuario_con_jugadores.id, name="Mi Equipo",
+        starters=[(7, 0), (8, 0), (9, 0)],
+        substitutes=[(10, 0), (11, 0), (12, 0)],
+    )
+ 
+    por_id = {p.player_id: p for p in db.query(models.Player).all()}
+    assert [por_id[i].is_starter for i in (7, 8, 9)] == [True, True, True]
+    assert [por_id[i].is_starter for i in (10, 11, 12)] == [False, False, False]
+ 
+ 
+def test_add_team_asigna_el_behavior_de_cada_jugador(db, usuario_con_jugadores):
+    repo.add_team(
+        db, owner_id=usuario_con_jugadores.id, name="Mi Equipo",
+        starters=[(7, 5), (8, 0), (9, 0)],
+        substitutes=[(10, 0), (11, 0), (12, 5)],
+    )
+ 
+    por_id = {p.player_id: p for p in db.query(models.Player).all()}
+    assert por_id[7].behavior_id == 5
+    assert por_id[8].behavior_id == 0
+    assert por_id[12].behavior_id == 5
+ 
+ 
+def test_add_team_no_toca_a_los_otros_jugadores(db, usuario_con_jugadores):
+    make_player(db, usuario_con_jugadores.id, 99)   # no esta en el equipo
+ 
+    repo.add_team(
+        db, owner_id=usuario_con_jugadores.id, name="Mi Equipo",
+        starters=[(7, 0), (8, 0), (9, 0)],
+        substitutes=[(10, 0), (11, 0), (12, 0)],
+    )
+ 
+    ajeno = db.get(models.Player, 99)
+    assert ajeno.team_id is None
+    assert not ajeno.is_starter
+ 
+ 
+def test_add_team_jugador_inexistente_hace_rollback(db, usuario_con_jugadores):
+    with pytest.raises(Exception):
+        repo.add_team(
+            db, owner_id=usuario_con_jugadores.id, name="Mi Equipo",
+            starters=[(7, 0), (8, 0), (999, 0)],   # el 999 no existe
+            substitutes=[],
+        )
+ 
+    assert db.query(models.Team).count() == 0          # el equipo no quedo
+    assert db.get(models.Player, 7).team_id is None    # ni los jugadores ya asignados
+ 
+ 
+def test_add_team_nombre_duplicado_para_el_mismo_usuario(db, usuario_con_jugadores):
+    user = usuario_con_jugadores
+    repo.add_team(db, owner_id=user.id, name="Mi Equipo", starters=[], substitutes=[])
+ 
+    with pytest.raises(IntegrityError):
+        repo.add_team(db, owner_id=user.id, name="Mi Equipo", starters=[], substitutes=[])
+ 
+    assert db.query(models.Team).count() == 1   # y la sesion sigue usable (hubo rollback)
+ 
+ 
+def test_add_team_mismo_nombre_para_usuarios_distintos(db, usuario_con_jugadores):
+    otro = make_user(db, club="pedro", email="pedro@gmail.com")
+    repo.add_team(db, owner_id=usuario_con_jugadores.id, name="Mi Equipo", starters=[], substitutes=[])
+ 
+    repo.add_team(db, owner_id=otro.id, name="Mi Equipo", starters=[], substitutes=[])
+ 
+    assert db.query(models.Team).count() == 2
