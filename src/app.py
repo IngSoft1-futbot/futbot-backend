@@ -31,7 +31,7 @@ app.add_middleware(
 )
  
  
-@app.get("/health", tags=["health"])
+@app.get("/health", tags=["Health"])
 def health_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
@@ -66,7 +66,7 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
     "/auth/register",
     response_model=schemas.UserOut,
     status_code=status.HTTP_201_CREATED,  
-    tags=["users"],
+    tags=["Users"],
     responses=responses.REGISTER_RESPONSES
 )
 def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -93,7 +93,7 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Conflict in register time.",
         )
 
-@app.post("/auth/login/", tags=["Login"], responses=responses.LOGIN_RESPONSES) 
+@app.post("/auth/login/", tags=["Users"], responses=responses.LOGIN_RESPONSES) 
 def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_header: HTTPAuthorizationCredentials | None = Depends(security_optional)):
 
     if auth_header:
@@ -141,8 +141,13 @@ def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_
     tags=["Teams"],
     responses=responses.CREATE_TEAM_RESPONSES
 )
-def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depends(get_db)):
-    #aqui necesitamos verificacion de autenticidad
+def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
+
+    if current_user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to create teams for another user.",
+        )
     try:
         return utils.create_team(db, user_id, team_in)
     except schemas.UserNotFoundError:

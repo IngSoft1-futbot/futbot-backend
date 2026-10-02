@@ -12,11 +12,11 @@ REGISTER_RESPONSES = {
                     },
                     "club_in_use": {
                         "summary": "Club name already in use",
-                        "value": {"detail": "Club name already in use."}
+                        "value": {"detail": "Club already in use."}
                     },
                     "password_invalid": {
                         "summary": "Password does not meet requirements",
-                        "value": {"detail": "Password does not meet requirements."}
+                        "value": {"detail": "Password must contain at least one digit."}
                     }
                 }
             }
@@ -60,18 +60,35 @@ CREATE_TEAM_RESPONSES = {
             }
         },
     },
+    401: {
+    "description": "Unauthorized",
+    "content": {
+        "application/json": {
+            "examples": {
+                "invalid_token": {
+                    "summary": "Invalid or missing token",
+                    "value": {"detail": "Could not validate credentials."}
+                    }
+                }
+            }
+        }
+    },
     403: {
         "description": "Forbidden",
         "content": {
             "application/json": {
                 "examples": {
+                    "user_not_owner": {
+                        "summary": "Not allowed to create teams for another user",
+                        "value": {"detail": "Not allowed to create teams for another user."}
+                    },
                     "player_not_owner": {
                         "summary": "User is not the owner of the player",
-                        "value": {"User is not the owner of the player."}
+                        "value": {"detail": "User is not the owner of the player."}
                     },
                     "behavior_not owner": {
                         "summary": "User is not the owner of the behavior",
-                        "value": {"User is not the owner of the behavior."}
+                        "value": {"detail": "User is not the owner of the behavior."}
                     }
                 }
             }
@@ -84,15 +101,15 @@ CREATE_TEAM_RESPONSES = {
                 "examples": {
                     "user_not_found":{
                         "summary": "User can not find.",
-                        "value": {"User can not find."}
+                        "value": {"detail": "User can not find."}
                     },
                     "player_not_found":{
                         "summary": "Player can not find.",
-                        "value": {"Player can not find."}
+                        "value": {"detail": "Player can not find."}
                     },
                     "behavior_not_found":{
                         "summary": "Behavior can not find.",
-                        "value": {"Behavior can not find."}
+                        "value": {"detail": "Behavior can not find."}
                     }
                 }
             }
