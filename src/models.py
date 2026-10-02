@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Boolean, UniqueConstraint
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship, declarative_base
- 
+
 Base = declarative_base()
 
 class User(Base):
@@ -14,6 +14,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     avatar = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    player_amount = Column(Integer, default=0, nullable=False)
  
     teams = relationship("Team", back_populates="owner")  # un usuario puede tener varios equipos
     ranking_entry = relationship("GlobalRankingEntry", back_populates="user", uselist=False)
