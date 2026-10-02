@@ -1,5 +1,5 @@
+from src.schemas import UserOut
 from typing import Any
-import secrets
 from .schemas import PlayerIn, PlayerOut, PacssAttributes
 from typing import Optional
 from sqlalchemy.exc import IntegrityError
@@ -98,7 +98,7 @@ def add_team(
 
 def create_player(db: Session, user_id: int, player: PlayerIn) -> PlayerOut:
 
-    user: Any | None = db.get(models.User, user_id)
+    user: Optional[UserOut] = db.get(models.User, user_id)
 
     if user is None:
         return None

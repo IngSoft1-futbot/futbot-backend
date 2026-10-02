@@ -10,8 +10,6 @@ from contextlib import asynccontextmanager
 
 from . import schemas, utils, responses
 from .database import get_db, init_db
-from .product_repository import auth_login , create_player
-from .utils import verify_player
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
