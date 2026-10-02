@@ -1,7 +1,11 @@
 from fastapi.responses import JSONResponse
 from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 from contextlib import asynccontextmanager
 
 from . import schemas, utils, responses
@@ -11,25 +15,60 @@ from .utils import verify_player
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Todo lo que va antes del yield corre al ARRANCAR
-    init_db()
+    try: # Antes del yield: corre al ARRANCAR (crea tablas y siembra el behavior 0)
+        init_db()
+    except SQLAlchemyError:
+        print("WARNING: database not available")
     yield
-    # Todo lo que va después del yield corre al APAGAR (por ahora nada)
-
-app = FastAPI(title="Futbot API")
-
+    # Despues del yield: corre al APAGAR (por ahora nada)
+ 
+ 
+app = FastAPI(title="Futbot API", lifespan=lifespan)
+ 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # ajustá al puerto de tu React
+    allow_origins=["http://localhost:5173"],  # ajustar al puerto del React
     allow_methods=["*"],
     allow_headers=["*"],
 )
+ 
+ 
+@app.get("/health", tags=["Health"])
+def health_check(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable.",
+        )
+    return {"status": "ok", "database": "online"}
+ 
+
+# Configuracion de seguridad para extraer el token Bearer del header
+security = HTTPBearer()
+
+security_optional = HTTPBearer(auto_error=False)
+
+#Funcion de seguridad para proteger rutas privadas.Extrae el token Bearer del header de la peticion, lo valida utilizando la capa de utilidades y retorna el ID del usuario si es legitimo
+def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
+    """
+    Dependencia de FastAPI para proteger rutas. 
+    Intercepta el token, lo valida usando utils y devuelve el id del usuario.
+    """
+    try:
+        return utils.verify_jwt_token(credentials.credentials)
+    except schemas.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials."
+        )
 
 @app.post(
     "/auth/register",
     response_model=schemas.UserOut,
     status_code=status.HTTP_201_CREATED,  
-    tags=["users"],
+    tags=["Users"],
     responses=responses.REGISTER_RESPONSES
 )
 def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
@@ -56,50 +95,108 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Conflict in register time.",
         )
 
-@app.post("/auth/login/") 
-def login_endpoint(request : schemas.UserLoginIn):  
-    user_token: str | None = auth_login(request.email , request.password)
+@app.post("/auth/login/", tags=["Users"], responses=responses.LOGIN_RESPONSES) 
+def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_header: HTTPAuthorizationCredentials | None = Depends(security_optional)):
 
-    try:
-        if user_token is None:
+    if auth_header:
+        try: 
+            utils.verify_jwt_token(auth_header.credentials)
+            # Si pasa sin errores, significa que el token es VALIDO y ACTIVO ppor lo que el usuario ya tiene un token
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Something went wrong, please try again.",
+                detail="Ya posees un token activo. No puedes volver a iniciar sesion."
             )
-    except schemas.BadCredentials:
-        raise HTTPException(
+        except schemas.InvalidTokenError:
+            # Si mandan un token corrupto o inventado, cortamos con unauthorized
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token."
+            )
+
+
+    # Delegamos la autenticacion y la generacion del token a la capa de utils
+    token = utils.authenticate_and_create_token(db, email=credentials.email, password=credentials.password)
+    
+    if not token:
+        return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect Email or Password, try again."
+            content={
+                "status": "401 Unauthorized",
+                "message": "Invalid email or password."
+            }
         )
-    except schemas.Fobbiden:
+    
+    return {
+        "status": "200",
+        "data": {
+            "access_token": token,
+            "token_type": "bearer"
+        },
+        "message": "Login successful."
+    }
+
+
+@app.post(
+    "/users/{user_id}/teams",
+    response_model=schemas.TeamOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Teams"],
+    responses=responses.CREATE_TEAM_RESPONSES
+)
+def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
+
+    if current_user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden"
+            detail="Not allowed to create teams for another user.",
         )
-    
-@app.post("/users/{user_id}/players")
-def create_user_player(user_id : int, player : schemas.PlayerIn):
-
-
-    if (not verify_player(player)):
-       return JSONResponse(
-            status_code=400,
-            content={
-                "status": "400 Bad Request",
-                "message": "PACSS attributes exceed the maximum allowed points."
-            })
-       
-    
-    created_player : schemas.PlayerOut = create_player(user_id ,player)
-        
-    content = {
-             "status": "201",
-             "data": created_player.model_dump(),
-                "message": "Player created successfully"
-         }
-    return JSONResponse(status_code = 201,
-    content=content)
-
+    try:
+        return utils.create_team(db, user_id, team_in)
+    except schemas.UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User can not find."
+        )
+    except schemas.PlayerNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player can not find."
+        )
+    except schemas.BehaviorNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Behavior can not find."
+        )
+    except schemas.PlayerNotAuthorizedError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not the owner of the player."
+        )
+    except schemas.BehaviorNotAuthorizedError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not the owner of the behavior."
+        )
+    except schemas.TeamNameAlreadyInUseError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= "Team name already in use for this user."
+        )
+    except schemas.TeamIncompleteError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= "Team incomplete, must be 3 starters & 3 subtitutes."
+        )
+    except schemas.PlayerAlreadyInUseError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= "Some players are already in use."
+        )
+    except schemas.CreateTeamError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conflict in creation time."
+        )
 
 if __name__ == '__main__':
     import uvicorn
