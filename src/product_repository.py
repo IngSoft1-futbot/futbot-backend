@@ -1,5 +1,5 @@
+from src.schemas import UserNotFoundError
 from src.schemas import UserOut
-from typing import Any
 from .schemas import PlayerIn, PlayerOut, PacssAttributes
 from typing import Optional
 from sqlalchemy.exc import IntegrityError
@@ -101,21 +101,17 @@ def create_player(db: Session, user_id: int, player: PlayerIn) -> PlayerOut:
     user: Optional[UserOut] = db.get(models.User, user_id)
 
     if user is None:
-        return None
+        raise UserNotFoundError()
 
-    user.numb_players += 1
-
-    p = PlayerIn(
+    p = models.Player(
         name=player.name,
-        user_id=user_id,
-        shirt_numb=player.shirt_numb,
-        paccs=PacssAttributes(
-            power=player.pacss_attributes.power,
-            agility=player.pacss_attributes.agility,
-            control=player.pacss_attributes.control,
-            speed=player.pacss_attributes.speed,
-            strength=player.pacss_attributes.strength,
-        ),
+        owner_id=user_id,
+        shirt_number=player.shirt_number,
+        power=player.pacss_attributes.power,
+        agility=player.pacss_attributes.agility,
+        control=player.pacss_attributes.control,
+        speed=player.pacss_attributes.speed,
+        strength=player.pacss_attributes.strength,
     )
 
     db.add(p)
@@ -125,7 +121,8 @@ def create_player(db: Session, user_id: int, player: PlayerIn) -> PlayerOut:
     return PlayerOut(
         player_id=p.player_id,
         name=p.name,
-        shirt_numb=p.shirt_numb,
+        shirt_number=p.shirt_number,
+        behavior_id=0,
         pacss_attributes=PacssAttributes(
             power=p.power,
             agility=p.agility,
