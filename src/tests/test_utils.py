@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
 import pytest
 import jwt
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from src import schemas, utils
 
@@ -482,6 +482,32 @@ def test_create_team_integrity_error_se_traduce(db, repo_team):
  
     with pytest.raises(schemas.CreateTeamError):
         utils.create_team(db, 1, make_team_in())
- 
- 
- 
+
+# --------------   TESTS DE AMISTOSOS   --------------
+
+def test_get_friendly_matches_devuelve_lo_que_trae_el_repository(db, repo_mock):
+    matches = [SimpleNamespace(id_match=1), SimpleNamespace(id_match=2)]
+    repo_mock.get_open_friendly_matches.return_value = matches
+
+    assert utils.get_available_friendly_matches(db) == matches
+    repo_mock.get_open_friendly_matches.assert_called_once_with(db)
+
+
+def test_get_friendly_matches_sin_partidos_devuelve_lista_vacia(db, repo_mock):
+    repo_mock.get_open_friendly_matches.return_value = []
+
+    assert utils.get_available_friendly_matches(db) == []
+
+
+def test_get_friendly_matches_error_de_base_se_convierte_en_friendly_matches_error(db, repo_mock):
+    repo_mock.get_open_friendly_matches.side_effect = SQLAlchemyError()
+
+    with pytest.raises(schemas.FriendlyMatchesError):
+        utils.get_available_friendly_matches(db)
+
+
+def test_get_friendly_matches_no_esconde_errores_que_no_son_de_la_base(db, repo_mock):
+    repo_mock.get_open_friendly_matches.side_effect = AttributeError()
+
+    with pytest.raises(AttributeError):
+        utils.get_available_friendly_matches(db)

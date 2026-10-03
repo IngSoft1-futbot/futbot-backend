@@ -195,3 +195,24 @@ def test_player_out_se_construye_desde_un_objeto_orm():
  
     assert out.model_dump() == {"player_id": 7, "name": "Lionel Messi", "behavior_id": 0}
  
+
+# --------------   TESTS DE AMISTOSOS   --------------
+
+def test_friendly_match_out_se_construye_desde_un_objeto_orm():
+    orm_match = SimpleNamespace(
+        id_match=1, home_team_id=3, match_duration=10, is_private=True,
+        away_team_id=None, status="open", password="secreta",   # atributos de mas: se ignoran
+    )
+
+    out = schemas.FriendlyMatchOut.model_validate(orm_match)
+
+    assert out.model_dump() == {
+        "id_match": 1, "home_team_id": 3, "match_duration": 10, "is_private": True,
+    }
+
+
+def test_friendly_match_out_exige_la_duracion():
+    orm_match = SimpleNamespace(id_match=1, home_team_id=3, match_duration=None, is_private=False)
+
+    with pytest.raises(ValidationError):
+        schemas.FriendlyMatchOut.model_validate(orm_match)

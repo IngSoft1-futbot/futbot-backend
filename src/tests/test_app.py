@@ -279,3 +279,45 @@ def test_create_team_token_de_otro_usuario(client, utils_mock):
     assert r.status_code == 403
     utils_mock.create_team.assert_not_called()
  
+# --------------   TESTS DE AMISTOSOS   --------------
+
+FAKE_FRIENDLIES = [
+    {"id_match": 1, "home_team_id": 3, "match_duration": 10, "is_private": False},
+    {"id_match": 2, "home_team_id": 4, "match_duration": 15, "is_private": True},
+]
+
+
+def test_friendly_matches_ok(client, utils_mock):
+    utils_mock.get_available_friendly_matches.return_value = FAKE_FRIENDLIES
+
+    r = client.get("/friendlymatches")
+
+    assert r.status_code == 200
+    assert r.json() == FAKE_FRIENDLIES
+    utils_mock.get_available_friendly_matches.assert_called_once()
+
+
+def test_friendly_matches_lista_vacia(client, utils_mock):
+    utils_mock.get_available_friendly_matches.return_value = []
+
+    r = client.get("/friendlymatches")
+
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_friendly_matches_no_expone_la_password(client, utils_mock):
+    utils_mock.get_available_friendly_matches.return_value = [{**FAKE_FRIENDLIES[1], "password": "secreta"}]
+
+    body = client.get("/friendlymatches").json()
+
+    assert "password" not in body[0]
+
+
+def test_friendly_matches_error_de_base(client, utils_mock):
+    utils_mock.get_available_friendly_matches.side_effect = schemas.FriendlyMatchesError
+
+    r = client.get("/friendlymatches")
+
+    assert r.status_code == 500
+    assert r.json()["detail"] == "Error retrieving teams."

@@ -270,3 +270,61 @@ def test_add_team_mismo_nombre_para_usuarios_distintos(db, usuario_con_jugadores
     repo.add_team(db, owner_id=otro.id, name="Mi Equipo", starters=[], substitutes=[])
  
     assert db.query(models.Team).count() == 2
+
+# --------------   TESTS DE AMISTOSOS   --------------
+
+def make_match(db, home_team_id, **over):
+    data = dict(home_team_id=home_team_id, match_duration=10, is_friendly=True, status="open")
+    data.update(over)
+    match = models.Match(**data)
+    db.add(match)
+    db.commit()
+    return match
+
+
+@pytest.fixture
+def equipo_local(db):
+    user = make_user(db)
+    return repo.add_team(db, owner_id=user.id, name="Mi Equipo", starters=[], substitutes=[])
+
+
+def test_get_open_friendly_matches_devuelve_solo_amistosos_abiertos(db, equipo_local):
+    abierto = make_match(db, equipo_local.team_id)
+    make_match(db, equipo_local.team_id, status="started")
+    make_match(db, equipo_local.team_id, status="cancelled")
+    make_match(db, equipo_local.team_id, is_friendly=False)   # partido de liga
+
+    result = repo.get_open_friendly_matches(db)
+
+    assert [m.id_match for m in result] == [abierto.id_match]
+
+
+def test_get_open_friendly_matches_sin_partidos(db):
+    assert repo.get_open_friendly_matches(db) == []
+
+
+def test_get_open_friendly_matches_incluye_los_privados(db, equipo_local):
+    make_match(db, equipo_local.team_id, is_private=True)
+
+    result = repo.get_open_friendly_matches(db)
+
+    assert len(result) == 1
+    assert result[0].is_private is True
+
+
+def test_get_open_friendly_matches_ordenados_por_id(db, equipo_local):
+    ids = [make_match(db, equipo_local.team_id).id_match for _ in range(3)]
+
+    result = repo.get_open_friendly_matches(db)
+
+    assert [m.id_match for m in result] == ids
+
+
+def test_get_open_friendly_matches_trae_los_datos_del_partido(db, equipo_local):
+    make_match(db, equipo_local.team_id, match_duration=15)
+
+    match = repo.get_open_friendly_matches(db)[0]
+
+    assert match.home_team_id == equipo_local.team_id
+    assert match.match_duration == 15
+    assert match.away_team_id is None   # espera rival
