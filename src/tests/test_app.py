@@ -37,18 +37,20 @@ TEAM_BODY = {
     ],
 }
  
+PACSS = {"power": 60, "agility": 60, "control": 60, "speed": 60, "strength": 60}
+
 FAKE_TEAM = {
     "team_id": 1,
     "name": "Mi Equipo",
     "jugadores_titulares": [
-        {"player_id": 7, "name": "Lionel Messi", "behavior_id": 0},
-        {"player_id": 8, "name": "Cristiano Ronaldo", "behavior_id": 0},
-        {"player_id": 9, "name": "Erling Haaland", "behavior_id": 0},
+        {"player_id": 7, "name": "Lionel Messi", "shirt_number": 10, "behavior_id": 0, "pacss_attributes": PACSS},
+        {"player_id": 8, "name": "Cristiano Ronaldo", "shirt_number": 9, "behavior_id": 0, "pacss_attributes": PACSS},
+        {"player_id": 9, "name": "Erling Haaland", "shirt_number": 8, "behavior_id": 0, "pacss_attributes": PACSS},
     ],
     "jugadores_suplentes": [
-        {"player_id": 10, "name": "Kevin De Bruyne", "behavior_id": 0},
-        {"player_id": 11, "name": "Virgil van Dijk", "behavior_id": 0},
-        {"player_id": 12, "name": "Emiliano Martinez", "behavior_id": 0},
+        {"player_id": 10, "name": "Kevin De Bruyne", "shirt_number": 7, "behavior_id": 0, "pacss_attributes": PACSS},
+        {"player_id": 11, "name": "Virgil van Dijk", "shirt_number": 6, "behavior_id": 0, "pacss_attributes": PACSS},
+        {"player_id": 12, "name": "Emiliano Martinez", "shirt_number": 5, "behavior_id": 0, "pacss_attributes": PACSS},
     ],
 }
 
