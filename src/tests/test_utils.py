@@ -518,3 +518,118 @@ def test_player_out_se_construye_desde_un_objeto_orm():
             "power": 90, "agility": 95, "control": 60, "speed": 30, "strength": 25,
         },
     }
+    
+# ============================== Crear Jugador
+
+def make_player_in(power=60, agility=60, control=60, speed=60, strength=60,
+                   shirt_number=10, name="Jugador 7"):
+    return schemas.PlayerIn(
+        name=name,
+        shirt_number=shirt_number,
+        pacss_attributes=schemas.PacssAttributes(
+            power=power, agility=agility, control=control,
+            speed=speed, strength=strength,
+        ),
+    )
+
+
+# ---------- validate_pacss / verify_player ----------
+
+def test_validate_pacss_ok():
+    assert utils.validate_pacss(make_player_in().pacss_attributes) is True
+
+
+@pytest.mark.parametrize(
+    "attrs",
+    [
+        dict(power=61),                           # suma 301
+        dict(power=59),                           # suma 299
+        dict(power=19, agility=61),               # suma 300 pero 19 < 20
+        dict(power=101, agility=19, control=20,
+             speed=80, strength=80),              # suma 300 pero 101 > 100
+    ],
+)
+def test_validate_pacss_invalido(attrs):
+    assert utils.validate_pacss(make_player_in(**attrs).pacss_attributes) is False
+
+
+def test_validate_pacss_limites_validos():
+    # 100 + 100 + 20 + 40 + 40 = 300, todos dentro de [20, 100]
+    p = make_player_in(power=100, agility=100, control=20, speed=40, strength=40)
+    assert utils.validate_pacss(p.pacss_attributes) is True
+
+
+def test_verify_player_cambio_de_pacss():
+    assert utils.verify_player(make_player_in()) is True
+    assert utils.verify_player(make_player_in(power=100)) is False
+
+
+# ---------- build_player_out ----------
+
+def test_build_player_out_desde_objeto_orm():
+    orm_player = SimpleNamespace(
+        player_id=7, name="Lionel Messi", shirt_number=10, behavior_id=0,
+        team_id=None, owner_id=1,                  # owner_id sobra: se ignora
+        power=90, agility=95, control=60, speed=30, strength=25,
+    )
+
+    out = utils.build_player_out(orm_player)
+
+    assert out.model_dump() == {
+        "player_id": 7,
+        "name": "Lionel Messi",
+        "shirt_number": 10,
+        "behavior_id": 0,
+        "team_id": None,
+        "pacss_attributes": {
+            "power": 90, "agility": 95, "control": 60, "speed": 30, "strength": 25,
+        },
+    }
+
+
+# ---------- create_player ----------
+
+def test_create_player_ok(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.create_player.return_value = make_player(7)
+
+    out = utils.create_player(db, 1, make_player_in())
+
+    assert isinstance(out, schemas.PlayerOut)
+    assert out.player_id == 7
+    assert out.shirt_number == 10
+    assert out.pacss_attributes.power == 60
+    repo_mock.create_player.assert_called_once()
+
+
+def test_create_player_pasa_los_datos_al_repository(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.create_player.return_value = make_player(7)
+    player_in = make_player_in()
+
+    utils.create_player(db, 1, player_in)
+
+    repo_mock.create_player.assert_called_once_with(db, 1, player_in)
+
+
+def test_create_player_usuario_inexistente(db, repo_mock):
+    repo_mock.get_user.return_value = None
+
+    with pytest.raises(schemas.UserNotFoundError):
+        utils.create_player(db, 1, make_player_in())
+
+    repo_mock.create_player.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "attrs",
+    [dict(power=100, agility=100, control=100, speed=100, strength=100),  # suma 500
+     dict(power=19, agility=61)],                                         # fuera de rango
+)
+def test_create_player_puntos_invalidos_no_toca_la_base(db, repo_mock, attrs):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+
+    with pytest.raises(schemas.PointAssignmentError):
+        utils.create_player(db, 1, make_player_in(**attrs))
+
+    repo_mock.create_player.assert_not_called()
