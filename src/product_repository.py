@@ -112,3 +112,9 @@ def create_player(db: Session, user_id: int, player: models.Player) -> models.Pl
 
     return p
 
+def get_players(db: Session, user_id: int) -> list[models.Player]:
+    return (
+            db.query(models.Player)
+            .filter(models.Player.owner_id == user_id)
+            .all()
+        )
