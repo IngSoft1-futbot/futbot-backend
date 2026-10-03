@@ -149,7 +149,7 @@ def create_player (user_id: int, player_in: schemas.PlayerIn, db: Session = Depe
             detail="Not allowed to players for another user.",
         )
     try:
-        return product_repository.create_player(db, user_id, player_in)
+        return utils.create_player(db, user_id, player_in)
     except schemas.UserNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
