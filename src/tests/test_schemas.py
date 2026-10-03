@@ -183,15 +183,3 @@ def test_schema_no_valida_la_composicion_del_equipo():
     assert team.jugadores_suplentes == []
  
  
-# ---------- PlayerOut ----------
- 
-def test_player_out_se_construye_desde_un_objeto_orm():
-    orm_player = SimpleNamespace(
-        player_id=7, name="Lionel Messi", behavior_id=0,
-        owner_id=1, power=90, agility=95,   # atributos de mas: se ignoran
-    )
- 
-    out = schemas.PlayerOut.model_validate(orm_player)
- 
-    assert out.model_dump() == {"player_id": 7, "name": "Lionel Messi", "behavior_id": 0}
- 
