@@ -270,3 +270,73 @@ def test_add_team_mismo_nombre_para_usuarios_distintos(db, usuario_con_jugadores
     repo.add_team(db, owner_id=otro.id, name="Mi Equipo", starters=[], substitutes=[])
  
     assert db.query(models.Team).count() == 2
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from src import models
+from src.database import Base
+from src.product_repository import get_players, create_user, create_player
+from src.schemas import PacssAttributes
+
+
+@pytest.fixture
+def db():
+    """BD en memoria para tests de repository."""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    return Session()
+
+
+def test_get_players_devuelve_jugadores_del_usuario(db):
+    # Crear dos usuarios
+    user1 = models.User(
+        club="club1", name="User1", email="user1@test.com", password_hash="hash"
+    )
+    user2 = models.User(
+        club="club2", name="User2", email="user2@test.com", password_hash="hash"
+    )
+    db.add_all([user1, user2])
+    db.commit()
+
+    # Crear jugadores para user1 y user2
+    p1 = models.Player(
+        name="Jugador 1", owner_id=user1.id, shirt_number=10,
+        power=60, agility=60, control=60, speed=60, strength=60,
+    )
+    p2 = models.Player(
+        name="Jugador 2", owner_id=user1.id, shirt_number=11,
+        power=60, agility=60, control=60, speed=60, strength=60,
+    )
+    p3 = models.Player(
+        name="Jugador 3", owner_id=user2.id, shirt_number=12,
+        power=60, agility=60, control=60, speed=60, strength=60,
+    )
+    db.add_all([p1, p2, p3])
+    db.commit()
+
+    # get_players debe devolver solo los de user1
+    result = get_players(db, user1.id)
+
+    assert len(result) == 2
+    assert all(p.owner_id == user1.id for p in result)
+    assert {p.name for p in result} == {"Jugador 1", "Jugador 2"}
+
+
+def test_get_players_usuario_sin_jugadores(db):
+    user = models.User(
+        club="vacio", name="User", email="empty@test.com", password_hash="hash"
+    )
+    db.add(user)
+    db.commit()
+
+    result = get_players(db, user.id)
+
+    assert result == []
+
+
+def test_get_players_usuario_inexistente(db):
+    result = get_players(db, 999)
+
+    assert result == []
