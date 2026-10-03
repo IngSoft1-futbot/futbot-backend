@@ -196,6 +196,22 @@ def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depend
             detail="Conflict in creation time."
         )
 
+@app.get(
+    "/friendlymatches",
+    response_model=list[schemas.FriendlyMatchOut],
+    status_code=status.HTTP_200_OK,
+    tags=["Matches"],
+    responses=responses.GET_FRIENDLY_MATCHES_RESPONSES
+)
+def get_friendly_matches(db: Session = Depends(get_db)):
+    try:
+        return utils.get_available_friendly_matches(db)
+    except schemas.FriendlyMatchesError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving teams."
+        )
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='0.0.0.0', port=8000)
