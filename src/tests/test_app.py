@@ -55,6 +55,25 @@ FAKE_PLAYER = {
     "team_id": None,
 }
 
+FAKE_PLAYERS = [
+    {
+        "player_id": 7,
+        "name": "Lionel Messi",
+        "shirt_number": 10,
+        "behavior_id": 0,
+        "pacss_attributes": PACSS,
+        "team_id": None,
+    },
+    {
+        "player_id": 8,
+        "name": "Cristiano Ronaldo",
+        "shirt_number": 9,
+        "behavior_id": 0,
+        "pacss_attributes": PACSS,
+        "team_id": None,
+    },
+]
+
 FAKE_TEAM = {
     "team_id": 1,
     "name": "Mi Equipo",
@@ -356,3 +375,65 @@ def test_create_team_token_de_otro_usuario(client, utils_mock):
     assert r.status_code == 403
     utils_mock.create_team.assert_not_called()
  
+#------------------------------------------Obtener Jugadores------------------------------------------
+
+
+def test_get_players_ok(client, utils_mock):
+    utils_mock.get_players.return_value = FAKE_PLAYERS
+
+    r = client.get("/users/1/players")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body, list)
+    assert len(body) == 2
+    assert body[0]["player_id"] == 7
+    assert body[1]["player_id"] == 8
+    assert all("pacss_attributes" in p for p in body)
+    utils_mock.get_players.assert_called_once()
+
+
+def test_get_players_lista_vacia(client, utils_mock):
+    utils_mock.get_players.return_value = []
+
+    r = client.get("/users/1/players")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body == []
+
+
+def test_get_players_pasa_user_id_a_utils(client, utils_mock):
+    app.dependency_overrides[get_current_user_id] = lambda: 42
+    utils_mock.get_players.return_value = []
+
+    client.get("/users/42/players")
+
+    _, user_id = utils_mock.get_players.call_args.args
+    assert user_id == 42
+
+
+def test_get_players_usuario_inexistente(client, utils_mock):
+    utils_mock.get_players.side_effect = schemas.UserNotFoundError
+
+    r = client.get("/users/1/players")
+
+    assert r.status_code == 404
+    assert r.json()["detail"] == "User could not be found."
+
+
+def test_get_players_token_de_otro_usuario(client, utils_mock):
+    r = client.get("/users/2/players")
+
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Not allowed to players for another user."
+    utils_mock.get_players.assert_not_called()
+
+
+def test_get_players_sin_token(client, utils_mock):
+    app.dependency_overrides.pop(get_current_user_id)
+
+    r = client.get("/users/1/players")
+
+    assert r.status_code in (401, 403)
+    utils_mock.get_players.assert_not_called()

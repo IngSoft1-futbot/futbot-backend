@@ -13,7 +13,6 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     avatar = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    player_amount = Column(Integer, default=0, nullable=False)
  
     teams = relationship("Team", back_populates="owner")  # un usuario puede tener varios equipos
     record = relationship("Record", back_populates="user", uselist=False)  # historial del club

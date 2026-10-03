@@ -200,6 +200,13 @@ def create_player(db: Session, user_id: int, player: schemas.PlayerIn):
     return build_player_out(repo.create_player(db, user_id, player))
 
 
+def get_players(db: Session, user_id: int):
+    if not repo.get_user(db,user_id):
+        raise schemas.UserNotFoundError()
+    players = repo.get_players(db,user_id)
+    return [build_player_out(p) for p in players]
+
+
 def build_player_out(player) -> schemas.PlayerOut:
     """Convierte un models.Player (columnas planas) en PlayerOut (pacss anidado)."""
     return schemas.PlayerOut(
