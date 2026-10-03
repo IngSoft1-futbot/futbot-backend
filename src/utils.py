@@ -1,4 +1,3 @@
-from .schemas import PlayerIn
 import os
 import jwt
 import bcrypt
@@ -124,7 +123,8 @@ def validate_pacss(pacss)-> bool:
 
     return True
 
-def verify_player(player: PlayerIn)-> bool:
+
+def verify_player(player: schemas.PlayerIn) -> bool:
 
     pacss: schemas.PacssAttributes = player.pacss_attributes
 
@@ -132,7 +132,6 @@ def verify_player(player: PlayerIn)-> bool:
 
 
 
-#-----------------Crear Equipo-----------------------
 
 def check_composition_and_duplicated(team_in: schemas.TeamCreate):      # composicion y duplicados dentro de peticion
     num_titulares = len(team_in.jugadores_titulares)
@@ -184,8 +183,38 @@ def build_team_out(team) -> schemas.TeamOut:
     return schemas.TeamOut(
         team_id=team.team_id,
         name=team.name,
-        jugadores_titulares=[schemas.PlayerOut.model_validate(p) for p in players if p.is_starter],
-        jugadores_suplentes=[schemas.PlayerOut.model_validate(p) for p in players if not p.is_starter],
+        jugadores_titulares=[
+            build_player_out(p) for p in players if p.is_starter
+        ],
+        jugadores_suplentes=[
+            build_player_out(p) for p in players if not p.is_starter
+        ],
+    )
+
+
+def create_player(db: Session, user_id: int, player: schemas.PlayerIn):
+    if not repo.get_user(db, user_id):
+        raise schemas.UserNotFoundError()
+    if not verify_player(player):
+        raise schemas.PointAssignmentError()
+    return build_player_out(repo.create_player(db, user_id, player))
+
+
+def build_player_out(player) -> schemas.PlayerOut:
+    """Convierte un models.Player (columnas planas) en PlayerOut (pacss anidado)."""
+    return schemas.PlayerOut(
+        player_id=player.player_id,
+        name=player.name,
+        shirt_number=player.shirt_number,
+        behavior_id=player.behavior_id,
+        team_id=player.team_id,
+        pacss_attributes=schemas.PacssAttributes(
+            power=player.power,
+            agility=player.agility,
+            control=player.control,
+            speed=player.speed,
+            strength=player.strength,
+        ),
     )
  
  
