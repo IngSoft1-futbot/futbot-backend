@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
@@ -5,7 +6,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src import models, product_repository as repo
-
 
 @pytest.fixture()
 def db():
@@ -271,20 +271,14 @@ def test_add_team_mismo_nombre_para_usuarios_distintos(db, usuario_con_jugadores
  
     assert db.query(models.Team).count() == 2
 
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from src import models
-from src.database import Base
-from src.product_repository import get_players, create_user, create_player
-from src.schemas import PacssAttributes
+
 
 
 @pytest.fixture
 def db():
     """BD en memoria para tests de repository."""
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
+    models.Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     return Session()
 
@@ -317,7 +311,7 @@ def test_get_players_devuelve_jugadores_del_usuario(db):
     db.commit()
 
     # get_players debe devolver solo los de user1
-    result = get_players(db, user1.id)
+    result = repo.get_players(db, user1.id)
 
     assert len(result) == 2
     assert all(p.owner_id == user1.id for p in result)
@@ -331,12 +325,136 @@ def test_get_players_usuario_sin_jugadores(db):
     db.add(user)
     db.commit()
 
-    result = get_players(db, user.id)
+    result = repo.get_players(db, user.id)
 
     assert result == []
 
 
 def test_get_players_usuario_inexistente(db):
-    result = get_players(db, 999)
+    result = repo.get_players(db, 999)
 
     assert result == []
+    
+    
+def make_user(db, club="juan", email="juan@gmail.com"):
+    """Crea un usuario de prueba."""
+    user = models.User(
+        club=club, 
+        name="Juan",
+        email=email, 
+        password_hash="hash", 
+        avatar=None,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+ 
+# ============================== create_player
+
+def test_create_player_ok(db):
+    user = models.User(
+        club="messi", name="Leo", email="leo@test.com", password_hash="hash"
+    )
+    db.add(user)
+    db.commit()
+
+    player = models.Player(name="Lionel Messi",
+            shirt_number=10,
+            power=90, agility=95, control=75, speed=80, strength=60)
+    
+    p = repo.create_player(db, user.id, player)
+
+    assert p.player_id is not None
+    assert p.name == "Lionel Messi"
+    assert p.shirt_number == 10
+    assert p.owner_id == user.id
+    assert p.power == 90
+    assert p.agility == 95
+    assert p.behavior_id == 0  # default
+    assert p.team_id is None
+    assert p.is_starter is False
+
+
+def test_create_player_persiste_en_la_base(db):
+    user = models.User(
+        club="ronaldo", name="CR7", email="cr7@test.com", password_hash="hash"
+    )
+    db.add(user)
+    db.commit()
+
+    player = models.Player(name="Cristiano Ronaldo",
+                shirt_number=7,
+                power=90, agility=95, control=75, speed=80, strength=60)
+
+    p = repo.create_player(db, user.id, player)
+    
+    player_id = p.player_id
+
+    # Verificar que está en la BD
+    db.refresh(p)
+    assert p.player_id == player_id
+    
+    # Consultar nuevamente
+    retrieved = db.query(models.Player).filter_by(player_id=player_id).first()
+    assert retrieved is not None
+    assert retrieved.name == "Cristiano Ronaldo"
+    assert retrieved.shirt_number == 7
+
+
+def test_create_player_multiples_para_mismo_usuario(db):
+    user = models.User(
+        club="fcb", name="Barça", email="fcb@test.com", password_hash="hash"
+    )
+    db.add(user)
+    db.commit()
+    
+    for i in range(3):
+        player = models.Player(name=f"Lionel Messi {i}",
+                    shirt_number=10,
+                    power=90, agility=95, control=75, speed=80, strength=60)
+        repo.create_player(db, user.id, player)
+
+    # Verificar que se crearon los 3 y pertenecen al usuario
+    players = db.query(models.Player).filter_by(owner_id=user.id).all()
+    assert len(players) == 3
+    assert all(p.owner_id == user.id for p in players)
+
+
+def test_create_player_con_pacss_valido(db):
+    user = models.User(
+        club="valid", name="Valid", email="valid@test.com", password_hash="hash"
+    )
+    db.add(user)
+    db.commit()
+
+    # Suma exacta a 300, cada uno en [20, 100]
+    player = models.Player(name="Lionel Messi",
+                    shirt_number=10,
+                    power=100, agility=100, control=50, speed=25, strength=25)
+
+    p = repo.create_player(db, user.id, player)
+
+    assert p.power + p.agility + p.control + p.speed + p.strength == 300
+    assert all(20 <= attr <= 100 for attr in [p.power, p.agility, p.control, p.speed, p.strength])
+
+
+def test_create_player_shirt_number_limites(db):
+    user = models.User(
+        club="limits", name="Limits", email="limits@test.com", password_hash="hash"
+    )
+    db.add(user)
+    db.commit()
+        
+    # Shirt 0
+    player = models.Player(name="Lionel Messi",
+                    shirt_number=0,
+                    power=90, agility=95, control=75, speed=80, strength=60)
+    p0 = repo.create_player(db, user.id, player)
+    assert p0.shirt_number == 0
+
+    # Shirt 99
+    player.name = "Jugador 99"
+    player.shirt_number = 99
+    p99 = repo.create_player(db, user.id, player)
+    assert p99.shirt_number == 99
