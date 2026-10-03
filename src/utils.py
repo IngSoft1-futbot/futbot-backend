@@ -1,7 +1,7 @@
 import os
 import jwt
 import bcrypt
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from . import product_repository as repo
@@ -194,4 +194,11 @@ def create_team(db: Session, user_id: int, team_in: schemas.TeamCreate):
         raise schemas.CreateTeamError()
  
     return build_team_out(team)
+
+def get_available_friendly_matches(db: Session):
+    """Amistosos disponibles: los que esperan a otro jugador (status open)."""
+    try:
+        return repo.get_open_friendly_matches(db)
+    except SQLAlchemyError:
+        raise schemas.FriendlyMatchesError()
 
