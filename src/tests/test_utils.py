@@ -169,9 +169,22 @@ def test_authenticate_and_create_token_falla(repo_mock):
 
 #-------------------------------------Crear Equipo-----------------------------------------------
  
-def make_player(pid, owner_id=1, team_id=None, behavior_id=0, is_starter=None):
-    return SimpleNamespace(player_id=pid, owner_id=owner_id, team_id=team_id,
-                           name=f"Jugador {pid}", behavior_id=behavior_id, is_starter=is_starter)
+def make_player(pid, owner_id=1, team_id=None, shirt_number=10, behavior_id=0,
+                is_starter=None, power=60, agility=60, control=60, speed=60, strength=60):
+    return SimpleNamespace(
+        player_id=pid,
+        owner_id=owner_id,
+        team_id=team_id,
+        name=f"Jugador {pid}",
+        shirt_number=shirt_number,
+        behavior_id=behavior_id,
+        is_starter=is_starter,
+        power=power,
+        agility=agility,
+        control=control,
+        speed=speed,
+        strength=strength,
+    )
  
  
 def make_behavior(bid, creator_id=None, is_default=False):
@@ -484,4 +497,24 @@ def test_create_team_integrity_error_se_traduce(db, repo_team):
         utils.create_team(db, 1, make_team_in())
  
  
+# ---------- PlayerOut ----------
  
+def test_player_out_se_construye_desde_un_objeto_orm():
+    orm_player = SimpleNamespace(
+        player_id=7, name="Lionel Messi", shirt_number=10, behavior_id=0,
+        team_id=None, owner_id=1,                      # owner_id sobra: se ignora
+        power=90, agility=95, control=60, speed=30, strength=25,
+    )
+
+    out = utils.build_player_out(orm_player)
+
+    assert out.model_dump() == {
+        "player_id": 7,
+        "name": "Lionel Messi",
+        "shirt_number": 10,
+        "behavior_id": 0,
+        "team_id": None,
+        "pacss_attributes": {
+            "power": 90, "agility": 95, "control": 60, "speed": 30, "strength": 25,
+        },
+    }
