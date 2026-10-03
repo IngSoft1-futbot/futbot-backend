@@ -55,27 +55,24 @@ class PacssAttributes(BaseModel):
 class PointAssignmentError(Exception):
     pass  # {HTTPERROR} 400
 
-class PointExcessError(PointAssignmentError):
-    pass  # {HTTPERROR} 400
-
-class PointDeficiencyError(PointAssignmentError):
-    pass  # {HTTPERROR} 400
-
 
 """ Player Schema """
 
 class PlayerIn(BaseModel):
     name: str
-    shirt_number: Optional[int] = None
+    shirt_number: int
     pacss_attributes: PacssAttributes
     team_id: Optional[int] = None
 
 class PlayerOut(BaseModel):
     player_id: int
     name: str
-    shirt_number: Optional[int] = None
+    shirt_number: int
+    behavior_id: Optional[int] = 0
     pacss_attributes: PacssAttributes
     team_id: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)  # permite leer desde el ORM
+    
     
 """ User Login Schema """
 
@@ -102,12 +99,6 @@ class PlayerAssignment(BaseModel):
     player_id: int
     behavior_id: Optional[int] = None   # None -> se asigna el 0 (default)
 
-class PlayerOut(BaseModel):
-    player_id: int
-    name: str
-    behavior_id: int
-
-    model_config = ConfigDict(from_attributes=True)  # permite leer desde el ORM
 
 class TeamCreate(BaseModel):
     name: TeamName
