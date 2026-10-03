@@ -1,6 +1,3 @@
-from src.schemas import UserNotFoundError
-from src.schemas import UserOut
-from .schemas import PlayerIn, PlayerOut, PacssAttributes
 from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -96,12 +93,7 @@ def add_team(
     return team
 
 
-def create_player(db: Session, user_id: int, player: PlayerIn) -> PlayerOut:
-
-    user: Optional[UserOut] = db.get(models.User, user_id)
-
-    if user is None:
-        raise UserNotFoundError()
+def create_player(db: Session, user_id: int, player: models.Player) -> models.Player:
 
     p = models.Player(
         name=player.name,
@@ -118,16 +110,5 @@ def create_player(db: Session, user_id: int, player: PlayerIn) -> PlayerOut:
     db.commit()
     db.refresh(p)
 
-    return PlayerOut(
-        player_id=p.player_id,
-        name=p.name,
-        shirt_number=p.shirt_number,
-        behavior_id=0,
-        pacss_attributes=PacssAttributes(
-            power=p.power,
-            agility=p.agility,
-            control=p.control,
-            speed=p.speed,
-            strength=p.strength,
-        ),
-    )
+    return p
+
