@@ -155,6 +155,11 @@ def create_player (user_id: int, player_in: schemas.PlayerIn, db: Session = Depe
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User could not be found."
         )
+    except schemas.PointAssignmentError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Points must total 300, each between 20 and 100."
+        )
     
 
 @app.post(
