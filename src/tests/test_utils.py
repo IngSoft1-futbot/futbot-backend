@@ -633,3 +633,48 @@ def test_create_player_puntos_invalidos_no_toca_la_base(db, repo_mock, attrs):
         utils.create_player(db, 1, make_player_in(**attrs))
 
     repo_mock.create_player.assert_not_called()
+    
+# ============================== get_players
+
+def test_get_players_ok(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_players.return_value = [
+        make_player(7, is_starter=True),
+        make_player(8, is_starter=False),
+    ]
+
+    out = utils.get_players(db, 1)
+
+    assert isinstance(out, list)
+    assert len(out) == 2
+    assert all(isinstance(p, schemas.PlayerOut) for p in out)
+    assert [p.player_id for p in out] == [7, 8]
+    repo_mock.get_players.assert_called_once_with(db, 1)
+
+
+def test_get_players_lista_vacia(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_players.return_value = []
+
+    out = utils.get_players(db, 1)
+
+    assert out == []
+    repo_mock.get_players.assert_called_once()
+
+
+def test_get_players_usuario_inexistente(db, repo_mock):
+    repo_mock.get_user.return_value = None
+
+    with pytest.raises(schemas.UserNotFoundError):
+        utils.get_players(db, 999)
+
+    repo_mock.get_players.assert_not_called()
+
+
+def test_get_players_hace_una_consulta_a_la_base(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_players.return_value = [make_player(7)]
+
+    utils.get_players(db, 1)
+
+    repo_mock.get_players.assert_called_once_with(db, 1)
