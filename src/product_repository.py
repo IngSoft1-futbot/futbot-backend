@@ -99,11 +99,11 @@ def create_player(db: Session, user_id: int, player: models.Player) -> models.Pl
         name=player.name,
         owner_id=user_id,
         shirt_number=player.shirt_number,
-        power=player.pacss_attributes.power,
-        agility=player.pacss_attributes.agility,
-        control=player.pacss_attributes.control,
-        speed=player.pacss_attributes.speed,
-        strength=player.pacss_attributes.strength,
+        power=player.power,
+        agility=player.agility,
+        control=player.control,
+        speed=player.speed,
+        strength=player.strength,
     )
 
     db.add(p)
