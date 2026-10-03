@@ -39,6 +39,22 @@ TEAM_BODY = {
  
 PACSS = {"power": 60, "agility": 60, "control": 60, "speed": 60, "strength": 60}
 
+PLAYER_BODY = {
+    "name": "Lionel Messi",
+    "shirt_number": 10,
+    "pacss_attributes": PACSS,
+    "team_id": None,
+}
+
+FAKE_PLAYER = {
+    "player_id": 7,
+    "name": "Lionel Messi",
+    "shirt_number": 10,
+    "behavior_id": 0,
+    "pacss_attributes": PACSS,
+    "team_id": None,
+}
+
 FAKE_TEAM = {
     "team_id": 1,
     "name": "Mi Equipo",
@@ -187,6 +203,65 @@ def test_login_endpoint_email_invalido_por_pydantic(client, utils_mock):
     
     assert response.status_code == 422
     utils_mock.authenticate_and_create_token.assert_not_called()
+    
+    
+#------------------------------------------Crear Jugador------------------------------------------
+
+
+def test_create_player_ok(client, utils_mock):
+    utils_mock.create_player.return_value = FAKE_PLAYER
+
+    r = client.post("/users/1/players", json=PLAYER_BODY)
+
+    assert r.status_code == 201
+    body = r.json()
+    assert body["player_id"] == 7
+    assert body["shirt_number"] == 10
+    assert body["pacss_attributes"]["power"] == 60
+    utils_mock.create_player.assert_called_once()
+
+
+def test_create_player_pasa_user_id_y_schema_a_utils(client, utils_mock):
+    app.dependency_overrides[get_current_user_id] = lambda: 42
+    utils_mock.create_player.return_value = FAKE_PLAYER
+
+    client.post("/users/42/players", json=PLAYER_BODY)
+
+    _, user_id, player_in = utils_mock.create_player.call_args.args
+    assert user_id == 42
+    assert isinstance(player_in, schemas.PlayerIn)
+    assert player_in.shirt_number == 10
+
+
+def test_create_player_sin_shirt_number_es_422(client, utils_mock):
+    body = {k: v for k, v in PLAYER_BODY.items() if k != "shirt_number"}
+
+    r = client.post("/users/1/players", json=body)
+
+    assert r.status_code == 422        # antes era un 500 por NotNullViolation
+    utils_mock.create_player.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "error, status_code, detail",
+    [
+        (schemas.UserNotFoundError, 404, "User could not be found."),
+        (schemas.PointAssignmentError, 400, "Points must total 300, each between 20 and 100."),
+    ],
+)
+def test_create_player_errores_de_negocio(client, utils_mock, error, status_code, detail):
+    utils_mock.create_player.side_effect = error
+
+    r = client.post("/users/1/players", json=PLAYER_BODY)
+
+    assert r.status_code == status_code
+    assert r.json()["detail"] == detail
+
+def test_create_player_token_de_otro_usuario(client, utils_mock):
+    r = client.post("/users/2/players", json=PLAYER_BODY)
+
+    assert r.status_code == 403
+    utils_mock.create_player.assert_not_called()
     
 #------------------------------------------Crear Equipo------------------------------------------
  
