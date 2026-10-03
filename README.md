@@ -121,3 +121,36 @@ Ejemplo: current_user_id: int = Depends(get_current_user_id)
 **Nombre**: 3 a 30 caracteres, unico por usuario. 
 **Plantel**: 3 titulares y 3 suplentes, sin repetidos. Un jugador solo puede estar en un equipo. 
 **Behavior**: opcional; sin behavior se usa el default (id 0).
+
+## Listar partidos amistosos
+`GET /friendlymatches` Devuelve los partidos amistosos disponibles, es decir, los que estan abiertos esperando a otro jugador. Es una ruta publica: no requiere token ni recibe parametros.
+
+### Recorrido
+1. **app.py** llama a `utils.get_available_friendly_matches`.
+2. **utils.py** pide la lista al repository. Si la base falla, convierte el error en `FriendlyMatchesError`.
+3. **product_repository.py** (`get_open_friendly_matches`) consulta los `Match` con `is_friendly = true` y `status = "open"`, ordenados por `id_match`.
+4. **app.py** serializa cada partido con `FriendlyMatchOut` y responde 200. Si recibe `FriendlyMatchesError`, responde 500.
+
+### Respuesta:
+| Codigo | Cuando | Contenido |
+| :--- | :--- | :--- |
+| **200** | Consulta exitosa | Lista de `FriendlyMatchOut` (vacia si no hay amistosos disponibles) |
+| **500** | Error al consultar la base | `detail: "Internal Server Error"` |
+
+Cada elemento de la lista:
+```
+{
+  "id_match": 1,
+  "home_team_id": 3,
+  "match_duration": 10,
+  "is_private": false
+}
+```
+
+### Reglas
+**Disponible:** amistoso (`is_friendly`) con `status` abierto. Los que ya empezaron, terminaron o se cancelaron no aparecen, y tampoco los partidos de liga.
+**Privados:** aparecen en el listado con `is_private: true`. La contraseña nunca se devuelve; se valida al unirse al partido.
+**Duracion:** `match_duration` es la duracion propia del amistoso, en minutos.
+
+### Tests
+Cada capa prueba lo suyo: schemas (`FriendlyMatchOut` desde el objeto de la base), repository (el filtro, con SQLite en memoria), utils (traduccion del error de la base) y app (200, lista vacia, 500 y que no se exponga la contraseña).
