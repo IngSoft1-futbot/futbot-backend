@@ -153,4 +153,20 @@ class TeamNotFoundError(Exception):            #404
 
 class CreateMatchError(Exception):             #409 condicion de carrera o fallo de BD
     pass
-    
+
+class JoinMatch(BaseModel):               #409 condicion de carrera o fallo de BD
+    team_id:int 
+    password: Optional[str] = Field(default=None, max_length=50)
+
+class JoinOwnMatchError(Exception):         #400
+    pass
+class MatchNotAuthorizedError(Exception):         #401
+    pass
+class TeamNotAuthorizedError(Exception):         #403
+    pass
+class MatchNotFoundError(Exception):         #404
+    pass
+class MatchAlreadyTakenError(Exception):         #409
+    pass
+class MatchNotJoinableError(Exception):         #409    
+    pass
