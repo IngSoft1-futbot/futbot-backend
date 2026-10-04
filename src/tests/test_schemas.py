@@ -197,7 +197,6 @@ def test_player_in_valido():
     p = schemas.PlayerIn(**PLAYER_IN)
 
     assert p.shirt_number == 10
-    assert p.team_id is None
 
 
 @pytest.mark.parametrize("campo", ["name", "shirt_number", "pacss_attributes"])

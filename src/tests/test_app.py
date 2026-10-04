@@ -184,7 +184,7 @@ def test_login_endpoint_exitoso(client, utils_mock):
     # Simulamos que la utilidad valida y devuelve el token de acceso
     utils_mock.authenticate_and_create_token.return_value = "abc123token"
 
-    response = client.post("/auth/login/", json={
+    response = client.post("/auth/login", json={
         "email": "joaco3@gmail.com",
         "password": "Pass1234!"
     })
@@ -201,7 +201,7 @@ def test_login_endpoint_credenciales_invalidas(client, utils_mock):
     # Simulamos que la autenticación falla y devuelve None
     utils_mock.authenticate_and_create_token.return_value = None
 
-    response = client.post("/auth/login/", json={
+    response = client.post("/auth/login", json={
         "email": "joaco3@gmail.com",
         "password": "PasswordMala1!"
     })
@@ -215,7 +215,7 @@ def test_login_endpoint_credenciales_invalidas(client, utils_mock):
 
 def test_login_endpoint_email_invalido_por_pydantic(client, utils_mock):
     # Aca no hace falta mockear nada porque Pydantic frena la peticion antes
-    response = client.post("/auth/login/", json={
+    response = client.post("/auth/login", json={
         "email": "correoInvalidoSinArroba",
         "password": "Pass1234!"
     })
@@ -426,7 +426,7 @@ def test_get_players_token_de_otro_usuario(client, utils_mock):
     r = client.get("/users/2/players")
 
     assert r.status_code == 403
-    assert r.json()["detail"] == "Not allowed to players for another user."
+    assert r.json()["detail"] == "Not allowed to view players of another user."
     utils_mock.get_players.assert_not_called()
 
 
