@@ -238,3 +238,83 @@ GET_PLAYERS_RESPONSES = {
     },
     404: CREATE_PLAYER_RESPONSES[404],
 }
+
+CREATE_FRIENDLY_MATCH_RESPONSES = {
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "id_mismatch": {
+                        "summary": "Path and body ID mismatch",
+                        "value": {"detail": "User ID in body does not match User ID in path."}
+                    },
+                    "invalid_duration": {
+                        "summary": "Invalid match duration",
+                        "value": {"detail": "Match duration must be between 1 and 5 minutes."}
+                    },
+                    "team_incomplete": {
+                        "summary": "Team does not have exactly 3 starters",
+                        "value": {"detail": "Team incomplete, must have exactly 3 starters."}
+                    }
+                }
+            }
+        },
+    },
+    401: {
+        "description": "Unauthorized",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "invalid_token": {
+                        "summary": "Invalid or missing token",
+                        "value": {"detail": "Could not validate credentials."}
+                    }
+                }
+            }
+        }
+    },
+    403: {
+        "description": "Forbidden",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "user_not_owner": {
+                        "summary": "Not allowed to create matches for another user",
+                        "value": {"detail": "Not allowed to create matches for another user."}
+                    }
+                }
+            }
+        }
+    },
+    404: {
+        "description": "Not Found",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "user_not_found": {
+                        "summary": "User not found",
+                        "value": {"detail": "User not found."}
+                    },
+                    "team_not_found": {
+                        "summary": "Team not found or does not belong to the user",
+                        "value": {"detail": "Team not found or does not belong to the user."}
+                    }
+                }
+            }
+        }
+    },
+    409: {
+        "description": "Conflict",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "conflict": {
+                        "summary": "Conflict in match creation",
+                        "value": {"detail": "Conflict in match creation."}
+                    }
+                }
+            }
+        }
+    }
+}
