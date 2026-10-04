@@ -246,10 +246,10 @@ def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depend
         )
 
 @app.get(
-    "/friendlymatches",
+    "/friendly-matches",
     response_model=list[schemas.GETFriendlyMatchOut],
     status_code=status.HTTP_200_OK,
-    tags=["Matches"],
+    tags=["Friendly Matches"],
     responses=responses.GET_FRIENDLY_MATCHES_RESPONSES
 )
 def get_friendly_matches(db: Session = Depends(get_db)):
