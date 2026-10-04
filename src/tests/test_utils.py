@@ -833,3 +833,117 @@ def test_create_friendly_match_integrity_error_se_traduce(db, repo_friendly):
 
     with pytest.raises(schemas.CreateMatchError):
         utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+# ----------------- join_friendly_match -----------------
+
+def make_match(status="open", away_team_id=None, owner_id=1, is_friendly=True,
+               is_private=False, password=None):
+    return SimpleNamespace(
+        id_match=1, is_friendly=is_friendly, status=status,
+        away_team_id=away_team_id, is_private=is_private, password=password,
+        home_team=SimpleNamespace(owner_id=owner_id),
+    )
+
+
+def make_team(team_id=5, owner_id=2, starters=3):
+    return SimpleNamespace(
+        team_id=team_id, owner_id=owner_id,
+        players=[make_player(i, is_starter=True) for i in range(1, starters + 1)],
+    )
+
+
+JOIN = schemas.JoinMatch(team_id=5)
+PWD = "Secreta1!"
+PRIVATE = make_match(is_private=True, password=utils.hash_password(PWD))
+
+
+@pytest.fixture
+def repo_join(repo_mock):
+    """Camino feliz: partido open de usuario 1, equipo 5 del usuario 2 con 3 titulares."""
+    repo_mock.get_match.return_value = make_match()
+    repo_mock.get_team.return_value = make_team()
+    repo_mock.join_match.return_value = SimpleNamespace(id_match=1, status="started", away_team_id=5)
+    return repo_mock
+
+
+def test_join_ok(db, repo_join):
+    out = utils.join_friendly_match(db, 2, 1, JOIN)
+
+    assert out.status == "started"
+    assert out.away_team_id == 5
+    repo_join.join_match.assert_called_once_with(db, match_id=1, away_team_id=5)
+
+
+@pytest.mark.parametrize(
+    "match, team, error",
+    [
+        (None, make_team(), schemas.MatchNotFoundError),
+        (make_match(is_friendly=False), make_team(), schemas.MatchNotFoundError),
+        (make_match(), None, schemas.TeamNotFoundError),
+        (make_match(), make_team(owner_id=9), schemas.TeamNotAuthorizedError),
+        (make_match(owner_id=2), make_team(), schemas.JoinOwnMatchError),
+        (make_match(status="started", away_team_id=7), make_team(), schemas.MatchAlreadyTakenError),
+        (make_match(status="finished"), make_team(), schemas.MatchNotJoinableError),
+        (make_match(status="cancelled"), make_team(), schemas.MatchNotJoinableError),
+        (make_match(), make_team(starters=2), schemas.TeamIncompleteError),
+    ],
+)
+def test_join_rechazos(db, repo_join, match, team, error):
+    repo_join.get_match.return_value = match
+    repo_join.get_team.return_value = team
+
+    with pytest.raises(error):
+        utils.join_friendly_match(db, 2, 1, JOIN)
+
+    repo_join.join_match.assert_not_called()
+
+
+def test_join_reintento_del_mismo_equipo_es_idempotente(db, repo_join):
+    match = make_match(status="started", away_team_id=5)
+    repo_join.get_match.return_value = match
+
+    assert utils.join_friendly_match(db, 2, 1, JOIN) is match
+    repo_join.join_match.assert_not_called()
+
+
+def test_join_pierde_la_carrera(db, repo_join):
+    repo_join.join_match.return_value = None     # otro gano el UPDATE condicional
+
+    with pytest.raises(schemas.MatchAlreadyTakenError):
+        utils.join_friendly_match(db, 2, 1, JOIN)
+
+
+
+def test_join_privado_con_password_correcta(db, repo_join):
+    repo_join.get_match.return_value = PRIVATE
+
+    utils.join_friendly_match(db, 2, 1, schemas.JoinMatch(team_id=5, password=PWD))
+
+    repo_join.join_match.assert_called_once_with(db, match_id=1, away_team_id=5)
+
+
+@pytest.mark.parametrize("password", [None, "", "Incorrecta1!"])
+def test_join_privado_con_password_mala_o_ausente(db, repo_join, password):
+    repo_join.get_match.return_value = PRIVATE
+
+    with pytest.raises(schemas.MatchNotAuthorizedError):
+        utils.join_friendly_match(db, 2, 1, schemas.JoinMatch(team_id=5, password=password))
+
+    repo_join.join_match.assert_not_called()
+
+
+def test_join_publico_ignora_la_password(db, repo_join):
+    utils.join_friendly_match(db, 2, 1, schemas.JoinMatch(team_id=5, password="cualquiera"))
+
+    repo_join.join_match.assert_called_once()
+
+
+def test_join_privado_valida_la_password_antes_que_el_estado(db, repo_join):
+    # un privado ya ocupado no debe revelar su estado a quien no tiene la password
+    repo_join.get_match.return_value = make_match(
+        status="started", away_team_id=7,
+        is_private=True, password=utils.hash_password(PWD),
+    )
+
+    with pytest.raises(schemas.MatchNotAuthorizedError):
+        utils.join_friendly_match(db, 2, 1, schemas.JoinMatch(team_id=5, password="mala"))

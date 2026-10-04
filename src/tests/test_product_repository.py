@@ -446,7 +446,12 @@ def test_create_match_friendly_lo_guarda(db, usuario_con_jugadores):
 # --------------   TESTS DE AMISTOSOS   --------------
 
 def make_match(db, home_team_id, **over):
-    data = dict(home_team_id=home_team_id, match_duration=10, is_friendly=True, status="open")
+    data = dict(home_team_id=home_team_id,
+                match_duration=10,
+                is_friendly=True,
+                status="open",
+                is_private=True,
+                )
     data.update(over)
     match = models.Match(**data)
     db.add(match)
@@ -500,3 +505,92 @@ def test_get_open_friendly_matches_trae_los_datos_del_partido(db, equipo_local):
     assert match.home_team_id == equipo_local.team_id
     assert match.match_duration == 15
     assert match.away_team_id is None   # espera rival
+
+# --------------   TESTS DE UNIRSE A AMISTOSO (join_match)   --------------
+
+def make_join_match(db, home_team_id, **over):
+    data = dict(home_team_id=home_team_id, match_duration=3, is_friendly=True,
+                status="open", is_private=False)
+    data.update(over)
+    match = models.Match(**data)
+    db.add(match)
+    db.commit()
+    return match
+
+
+@pytest.fixture
+def equipo_rival(db):
+    user = make_user(db, club="pedro", email="pedro@gmail.com")
+    return repo.add_team(db, owner_id=user.id, name="Rival", starters=[], substitutes=[])
+
+
+@pytest.fixture
+def partido_abierto(db, equipo_local):
+    return make_join_match(db, equipo_local.team_id)
+
+
+def test_join_match_ocupa_la_plaza_y_arranca_el_partido(db, partido_abierto, equipo_rival):
+    out = repo.join_match(db, match_id=partido_abierto.id_match, away_team_id=equipo_rival.team_id)
+
+    assert out.away_team_id == equipo_rival.team_id
+    assert out.status == "started"
+
+    db.expire_all()          # releer desde la base: quedo persistido
+    guardado = db.get(models.Match, partido_abierto.id_match)
+    assert guardado.away_team_id == equipo_rival.team_id
+    assert guardado.status == "started"
+
+
+def test_join_match_solo_gana_el_primero(db, partido_abierto, equipo_rival):
+    otro = repo.add_team(db, owner_id=equipo_rival.owner_id, name="Otro", starters=[], substitutes=[])
+
+    primero = repo.join_match(db, match_id=partido_abierto.id_match, away_team_id=equipo_rival.team_id)
+    segundo = repo.join_match(db, match_id=partido_abierto.id_match, away_team_id=otro.team_id)
+
+    assert primero is not None
+    assert segundo is None
+    assert db.get(models.Match, partido_abierto.id_match).away_team_id == equipo_rival.team_id
+
+
+@pytest.mark.parametrize("estado", ["started", "finished", "cancelled"])
+def test_join_match_no_pisa_partidos_que_no_estan_open(db, partido_abierto, equipo_rival, estado):
+    partido_abierto.status = estado
+    db.commit()
+
+    out = repo.join_match(db, match_id=partido_abierto.id_match, away_team_id=equipo_rival.team_id)
+
+    assert out is None
+    assert db.get(models.Match, partido_abierto.id_match).away_team_id is None
+    assert db.get(models.Match, partido_abierto.id_match).status == estado
+
+
+def test_join_match_no_pisa_un_rival_ya_asignado(db, equipo_local, equipo_rival):
+    # aunque el status siga "open", la condicion away_team_id IS NULL tambien protege la plaza
+    ocupado = make_join_match(db, equipo_local.team_id, away_team_id=equipo_local.team_id)
+
+    out = repo.join_match(db, match_id=ocupado.id_match, away_team_id=equipo_rival.team_id)
+
+    assert out is None
+    assert db.get(models.Match, ocupado.id_match).away_team_id == equipo_local.team_id
+
+
+def test_join_match_inexistente_devuelve_none(db, equipo_rival):
+    assert repo.join_match(db, match_id=999, away_team_id=equipo_rival.team_id) is None
+
+
+def test_join_match_no_toca_otros_partidos(db, partido_abierto, equipo_local, equipo_rival):
+    otro_partido = make_join_match(db, equipo_local.team_id)
+
+    repo.join_match(db, match_id=partido_abierto.id_match, away_team_id=equipo_rival.team_id)
+
+    db.refresh(otro_partido)
+    assert otro_partido.away_team_id is None
+    assert otro_partido.status == "open"
+
+
+def test_join_match_el_partido_sale_de_la_lista_de_abiertos(db, partido_abierto, equipo_rival):
+    assert len(repo.get_open_friendly_matches(db)) == 1
+
+    repo.join_match(db, match_id=partido_abierto.id_match, away_team_id=equipo_rival.team_id)
+
+    assert repo.get_open_friendly_matches(db) == []
