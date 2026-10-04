@@ -206,7 +206,7 @@ CREATE_PLAYER_RESPONSES = {
 }
 
 
-# El login rechaza a quien ya manda un token valido (ver app.py)
+# El login rechaza a quien ya manda un token valido
 LOGIN_RESPONSES[400] = {
     "description": "Bad request",
     "content": {
@@ -329,6 +329,90 @@ GET_FRIENDLY_MATCHES_RESPONSES = {
                     "internal_error": {
                         "summary": "Could not retrieve the available friendly matches",
                         "value": {"detail": "Internal Server Error"}
+                    }
+                }
+            }
+        }
+    }
+}
+
+JOIN_FRIENDLY_MATCH_RESPONSES = {
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "own_match": {
+                        "summary": "Cannot join your own match",
+                        "value": {"detail": "User cannot join their own match."}
+                    },
+                    "team_incomplete": {
+                        "summary": "Team does not have exactly 3 starters",
+                        "value": {"detail": "Team incomplete, must have exactly 3 starters."}
+                    }
+                }
+            }
+        },
+    },
+    401: {
+        "description": "Unauthorized",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "invalid_token": {
+                        "summary": "Invalid or missing token",
+                        "value": {"detail": "Could not validate credentials."}
+                    }
+                }
+            }
+        }
+    },
+    403: {
+        "description": "Forbidden",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "team_not_owner": {
+                        "summary": "User is not the owner of the team",
+                        "value": {"detail": "User is not the owner of the team."}
+                    },
+                    "not_authorized": {
+                        "summary": "Missing or incorrect password for a private match",
+                        "value": {"detail": "User is not authorized to join this match."}
+                    }
+                }
+            }
+        }
+    },
+    404: {
+        "description": "Not Found",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "match_not_found": {
+                        "summary": "Match not found",
+                        "value": {"detail": "Match not found."}
+                    },
+                    "team_not_found": {
+                        "summary": "Team not found",
+                        "value": {"detail": "Team not found."}
+                    }
+                }
+            }
+        }
+    },
+    409: {
+        "description": "Conflict",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "already_taken": {
+                        "summary": "Another player already joined",
+                        "value": {"detail": "Unable to join: another player has already joined."}
+                    },
+                    "not_joinable": {
+                        "summary": "Match finished or cancelled",
+                        "value": {"detail": "The match is no longer available: it is in progress, finished, or cancelled."}
                     }
                 }
             }

@@ -264,3 +264,59 @@ Cada elemento de la lista:
 
 ### Tests
 Cada capa prueba lo suyo: schemas (`FriendlyMatchOut` desde el objeto de la base), repository (el filtro, con SQLite en memoria), utils (traduccion del error de la base) y app (200, lista vacia, 500 y que no se exponga la contraseña).
+
+## Unirse a un partido amistoso
+
+`PUT /friendly-matches/{match_id}/away-team` Asigna el equipo del usuario autenticado como visitante de un amistoso abierto y lo pone en `started`. Requiere token Bearer. Es un PUT idempotente: repetir la request con el mismo equipo devuelve 200 sin cambios.
+
+### Payload
+```json
+{
+  "team_id": 5,
+  "password": "Secreta1!"
+}
+```
+
+* team_id: equipo del usuario autenticado (requerido).
+* password: solo se usa si el partido es privado (opcional, maximo 50 caracteres).
+
+### Recorrido
+1. **app.py**: valida el token (401) y el body (422). El usuario sale del token, no del body.
+2. **utils.py** (join_friendly_match), en este orden:
+    * El partido existe y es amistoso.
+    * El equipo existe y es del usuario.
+    * El usuario no es el creador del partido.
+    * Si el partido es privado, la contraseña coincide con el hash (bcrypt).
+    * Si el mismo equipo ya es el rival, devuelve el partido (idempotente).
+    * El partido no tiene rival ni esta finalizado o cancelado.
+    * El equipo tiene 3 titulares.
+3. **product_repository.py** (join_match): un solo `UPDATE ... WHERE status='open' AND away_team_id IS NULL` que setea `away_team_id` y `status='started'`. Si no modifica ninguna fila, otro jugador ocupo la plaza antes y se responde 409. Es atomico: nunca se pisa a un rival.
+
+### Respuesta:
+| Codigo | Cuando | detail |
+| :--- | :--- | :--- |
+| **200** | Unido (o reintento del mismo equipo) | FriendlyMatchOut con `away_team_id` y `status: "started"` |
+| **400** | Es su propio partido | User cannot join their own match. |
+| **400** | Equipo sin 3 titulares | Team incomplete, must have exactly 3 starters. |
+| **401** | Token invalido / ausente | Could not validate credentials. |
+| **401** | Contraseña ausente o incorrecta (partido privado) | User is not authorized to join this match. |
+| **403** | El equipo no es del usuario | User is not the owner of the team. |
+| **404** | Partido inexistente o no amistoso | Match not found. |
+| **404** | Equipo inexistente | Team not found. |
+| **409** | Otro jugador ya se unio | Unable to join: another player has already joined. |
+| **409** | Partido finalizado o cancelado | The match is no longer available: it is in progress, finished, or cancelled. |
+| **422** | Estructura invalida | Lista de Pydantic. |
+
+### Reglas
+**Resultado**: el partido queda `started` con el visitante asignado (`current_period` sigue en 0).
+**Privados**: la contraseña se valida antes que el estado, para no revelar si el partido ya tiene rival.
+**Nota**: hoy todos los amistosos se crean publicos, asi que la validacion de contraseña todavia no se alcanza desde la API.
+
+### Tests
+
+| Archivo | Que prueba |
+| :--- | :--- |
+| **test_schemas.py** | `JoinMatch`: `team_id` obligatorio y numerico, `password` opcional y con limite de largo |
+| **test_utils.py** | Camino feliz, cada rechazo (404, 401, 403, 400, 409), idempotencia, carrera perdida y partidos privados (contraseña correcta, mala, ausente, y que se valide antes que el estado) |
+| **test_product_repository.py** | `join_match` en SQLite: ocupa la plaza, **solo gana el primero**, no pisa partidos que no estan `open` ni con rival asignado, no toca otros partidos y el partido sale de la lista de abiertos |
+| **test_app.py** | Traduccion de cada excepcion a su codigo HTTP, que el usuario salga del token, que no se exponga `password`, 422 y falta de token |

@@ -258,7 +258,7 @@ def get_friendly_matches(db: Session = Depends(get_db)):
     except schemas.FriendlyMatchesError:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error retrieving teams."
+            detail="Error retrieving matches."
         )
 
 @app.post(
@@ -310,6 +310,36 @@ def create_friendly_match(
             status_code=status.HTTP_409_CONFLICT,
             detail="Conflict in match creation."
         )
+
+@app.put(
+    "/friendly-matches/{match_id}/away-team",
+    response_model=schemas.FriendlyMatchOut,
+    tags=["Friendly Matches"],
+    responses=responses.JOIN_FRIENDLY_MATCH_RESPONSES
+)
+def join_friendly_match(match_id:int,
+                        join_in:schemas.JoinMatch,
+                        db:Session=Depends(get_db),
+                        current_user_id:int=Depends(get_current_user_id)):
+
+    try:
+        return utils.join_friendly_match(db, current_user_id, match_id, join_in)
+    except schemas.MatchNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Match not found.")
+    except schemas.TeamNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Team not found.")
+    except schemas.TeamNotAuthorizedError:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "User is not the owner of the team.")
+    except schemas.MatchNotAuthorizedError:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User is not authorized to join this match.")
+    except schemas.JoinOwnMatchError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "User cannot join their own match.")
+    except schemas.TeamIncompleteError:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Team incomplete, must have exactly 3 starters.")
+    except schemas.MatchAlreadyTakenError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Unable to join: another player has already joined.")
+    except schemas.MatchNotJoinableError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "The match is no longer available: it is in progress, finished, or cancelled.")
 
 if __name__ == '__main__':
     import uvicorn

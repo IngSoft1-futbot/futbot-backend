@@ -3,6 +3,7 @@ import jwt
 import bcrypt
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
+from typing import Optional
 from . import product_repository as repo
 from . import schemas
 
@@ -59,6 +60,10 @@ def register_user(db: Session, user_in: schemas.UserCreate):
 
 
 #-----------------Login-----------------------
+
+def verify_password(password: str, password_hash: str) -> bool:
+    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
+
 def authenticate_user(db: Session, email: str, password: str):
     # 1. Buscar al usuario por email (normalizado en minusculas)
     user = repo.get_user_by_email(db, email=email.lower())
@@ -67,12 +72,7 @@ def authenticate_user(db: Session, email: str, password: str):
 
     # 2. Verificar la contraseña usando bcrypt
     # bcrypt.checkpw requiere bytes, por eso codificamos ambos
-    is_valid = bcrypt.checkpw(
-        password.encode("utf-8"), 
-        user.password_hash.encode("utf-8")
-    )
-    
-    if not is_valid:
+    if not verify_password(password, user.password_hash):
         return None
 
     return user
@@ -311,3 +311,44 @@ def get_available_friendly_matches(db: Session):
     except SQLAlchemyError:
         raise schemas.FriendlyMatchesError()
 
+def check_match_password(match, password: Optional[str]):
+    """Si el partido es privado, la contraseña tiene que venir y coincidir con el hash."""
+    if not match.is_private:
+        return
+    if not password or not match.password or not verify_password(password, match.password):
+        raise schemas.MatchNotAuthorizedError()
+    
+def join_friendly_match(db: Session, user_id: int, match_id: int, join_in: schemas.JoinMatch):
+    # El partido existe y es amistoso
+    match = repo.get_match(db, match_id)
+    if match is None or not match.is_friendly:
+        raise schemas.MatchNotFoundError()
+
+    # El equipo existe y es del usuario
+    team = repo.get_team(db, join_in.team_id)
+    if team is None:
+        raise schemas.TeamNotFoundError()
+    if team.owner_id != user_id:
+        raise schemas.TeamNotAuthorizedError()
+
+    # Estado del partido
+    if match.home_team.owner_id == user_id:
+        raise schemas.JoinOwnMatchError()
+    
+    check_match_password(match, join_in.password)
+    
+    if match.away_team_id == team.team_id:      # reintento del mismo equipo 
+        return match
+    if match.away_team_id is not None:          # ya tiene rival, por lo tanto esta started
+        raise schemas.MatchAlreadyTakenError()
+    if match.status != "open":                  # finished / cancelled
+        raise schemas.MatchNotJoinableError()
+
+    # Plantel completo (reutiliza la validacion de amistosos)
+    check_friendly_team(team)
+
+    # Ocupar la plaza de forma atomica
+    updated = repo.join_match(db, match_id=match_id, away_team_id=team.team_id)
+    if updated is None:                         # otro se unio entre el chequeo y el UPDATE
+        raise schemas.MatchAlreadyTakenError()
+    return updated

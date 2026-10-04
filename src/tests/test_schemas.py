@@ -312,3 +312,31 @@ def test_friendly_match_create_tipos_invalidos(campo, valor_invalido):
  
     with pytest.raises(ValidationError):
         schemas.FriendlyMatchCreate(**data)
+
+# --------------   TESTS DE UNIRSE A AMISTOSO (JoinMatch)   --------------
+
+def test_join_match_valido():
+    j = schemas.JoinMatch(team_id=5, password="Secreta1!")
+
+    assert j.team_id == 5
+    assert j.password == "Secreta1!"
+
+
+def test_join_match_password_es_opcional():
+    assert schemas.JoinMatch(team_id=5).password is None
+
+
+def test_join_match_falta_team_id():
+    with pytest.raises(ValidationError):
+        schemas.JoinMatch(password="Secreta1!")
+
+
+def test_join_match_team_id_no_numerico():
+    with pytest.raises(ValidationError):
+        schemas.JoinMatch(team_id="abc")
+
+
+def test_join_match_password_demasiado_larga():
+    # bcrypt rechaza mas de 72 bytes: se corta antes, con 422 en lugar de un 500
+    with pytest.raises(ValidationError):
+        schemas.JoinMatch(team_id=5, password="a" * 51)

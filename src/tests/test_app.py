@@ -552,4 +552,92 @@ def test_friendly_matches_error_de_base(client, utils_mock):
     r = client.get("/friendly-matches")
 
     assert r.status_code == 500
-    assert r.json()["detail"] == "Error retrieving teams."
+    assert r.json()["detail"] == "Error retrieving matches."
+
+# --------------   TESTS DE UNIRSE A AMISTOSO   --------------
+
+FAKE_JOINED_MATCH = {**FAKE_FRIENDLY_MATCH, "away_team_id": 5, "status": "started"}
+JOIN_BODY = {"team_id": 5}
+JOIN_URL = "/friendly-matches/10/away-team"
+
+
+def test_join_ok(client, utils_mock):
+    utils_mock.join_friendly_match.return_value = FAKE_JOINED_MATCH
+
+    r = client.put(JOIN_URL, json=JOIN_BODY)
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id_match"] == 10
+    assert body["away_team_id"] == 5
+    assert body["status"] == "started"
+    utils_mock.join_friendly_match.assert_called_once()
+
+
+def test_join_no_expone_la_password(client, utils_mock):
+    utils_mock.join_friendly_match.return_value = {**FAKE_JOINED_MATCH, "password": "hash-secreto"}
+
+    r = client.put(JOIN_URL, json=JOIN_BODY)
+
+    assert "password" not in r.json()
+
+
+def test_join_pasa_user_match_y_schema_a_utils(client, utils_mock):
+    app.dependency_overrides[get_current_user_id] = lambda: 42
+    utils_mock.join_friendly_match.return_value = FAKE_JOINED_MATCH
+
+    client.put("/friendly-matches/7/away-team", json={"team_id": 5, "password": "Secreta1!"})
+
+    _, user_id, match_id, join_in = utils_mock.join_friendly_match.call_args.args
+    assert user_id == 42            # sale del token, no del body
+    assert match_id == 7
+    assert isinstance(join_in, schemas.JoinMatch)
+    assert join_in.team_id == 5
+    assert join_in.password == "Secreta1!"
+
+
+@pytest.mark.parametrize(
+    "error, status_code, detail",
+    [
+        (schemas.MatchNotFoundError, 404, "Match not found."),
+        (schemas.TeamNotFoundError, 404, "Team not found."),
+        (schemas.TeamNotAuthorizedError, 403, "User is not the owner of the team."),
+        (schemas.MatchNotAuthorizedError, 401, "User is not authorized to join this match."),
+        (schemas.JoinOwnMatchError, 400, "User cannot join their own match."),
+        (schemas.TeamIncompleteError, 400, "Team incomplete, must have exactly 3 starters."),
+        (schemas.MatchAlreadyTakenError, 409, "Unable to join: another player has already joined."),
+        (schemas.MatchNotJoinableError, 409,
+         "The match is no longer available: it is in progress, finished, or cancelled."),
+    ],
+)
+def test_join_errores_de_negocio(client, utils_mock, error, status_code, detail):
+    utils_mock.join_friendly_match.side_effect = error
+
+    r = client.put(JOIN_URL, json=JOIN_BODY)
+
+    assert r.status_code == status_code
+    assert r.json()["detail"] == detail
+
+
+@pytest.mark.parametrize(
+    "url, body",
+    [
+        ("/friendly-matches/abc/away-team", {"team_id": 5}),    # match_id no numerico
+        (JOIN_URL, {}),                                          # falta team_id
+        (JOIN_URL, {"team_id": "abc"}),                          # team_id no numerico
+    ],
+)
+def test_join_422(client, utils_mock, url, body):
+    r = client.put(url, json=body)
+
+    assert r.status_code == 422
+    utils_mock.join_friendly_match.assert_not_called()
+
+
+def test_join_sin_token(client, utils_mock):
+    app.dependency_overrides.pop(get_current_user_id)
+
+    r = client.put(JOIN_URL, json=JOIN_BODY)
+
+    assert r.status_code in (401, 403)   # depende de la version de FastAPI
+    utils_mock.join_friendly_match.assert_not_called()

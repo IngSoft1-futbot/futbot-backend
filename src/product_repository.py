@@ -1,7 +1,7 @@
 from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
+from sqlalchemy import update
 from . import models, schemas
 
 
@@ -169,3 +169,32 @@ def get_open_friendly_matches(db: Session) -> list[models.Match]:
         .order_by(models.Match.id_match)
         .all()
     )
+
+def get_match(db: Session, match_id: int) -> Optional[models.Match]:
+    return db.get(models.Match, match_id)
+
+
+def get_team(db: Session, team_id: int) -> Optional[models.Team]:
+    return db.get(models.Team, team_id)
+
+
+def join_match(db: Session, *, match_id: int, away_team_id: int) -> Optional[models.Match]:
+    try:
+        result = db.execute(
+            update(models.Match)
+            .where(
+                models.Match.id_match == match_id,
+                models.Match.status == "open",
+                models.Match.away_team_id.is_(None),
+            )
+            .values(away_team_id=away_team_id, status="started")
+            .execution_options(synchronize_session=False)
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    if result.rowcount != 1:
+        return None
+    return db.get(models.Match, match_id, populate_existing=True)
