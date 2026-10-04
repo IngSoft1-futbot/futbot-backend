@@ -90,6 +90,25 @@ class TeamOut(BaseModel):
     jugadores_suplentes: list[PlayerOut]
 
 
+#---------------------- Friendly Matches schemas -----------------------
+
+class FriendlyMatchCreate(BaseModel):
+    team_name: str
+    match_duration: int
+
+class FriendlyMatchOut(BaseModel):
+    id_match: int
+    home_team_id: int
+    away_team_id: int | None = None
+    match_duration: int
+    status: str
+    is_friendly: bool
+    is_private: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+
 class UserNotFoundError(Exception):         #404
     pass
 class BehaviorNotFoundError(Exception):         #404
@@ -113,3 +132,13 @@ class TeamNameAlreadyInUseError(Exception):         #400
 
 class CreateTeamError(Exception):         #409 condicion de carrera
     pass
+
+class InvalidDurationError(Exception):         #400
+    pass
+
+class TeamNotFoundError(Exception):            #404
+    pass
+
+class CreateMatchError(Exception):             #409 condicion de carrera o fallo de BD
+    pass
+    

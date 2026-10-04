@@ -125,3 +125,39 @@ def get_players(db: Session, user_id: int) -> list[models.Player]:
             .filter(models.Player.owner_id == user_id)
             .all()
         )
+
+#-----------------FRIENDLY MATCHES-----------------------
+def create_match(
+    db: Session,
+    *,
+    is_friendly: bool,
+    status: str,
+    home_team_id: int,
+    away_team_id: Optional[int],
+    match_duration: int,
+    is_private: bool,
+    password: Optional[str],
+    current_period: int,
+    league_id: Optional[int],     
+    scheduled_at: Optional[int],  
+) -> models.Match:
+    match = models.Match(
+        is_friendly=is_friendly,
+        status=status,
+        home_team_id=home_team_id,
+        away_team_id=away_team_id,
+        match_duration=match_duration,
+        is_private=is_private,
+        password=password,
+        current_period=current_period,
+        league_id=league_id,
+        scheduled_at=scheduled_at,
+    )
+    db.add(match)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise
+    db.refresh(match)
+    return match

@@ -245,6 +245,56 @@ def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depend
             detail="Conflict in creation time."
         )
 
+@app.post(
+    "/users/{user_id}/friendly-matches",
+    response_model=schemas.FriendlyMatchOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Friendly Matches"],
+    responses= responses.CREATE_FRIENDLY_MATCH_RESPONSES
+)
+def create_friendly_match(
+    user_id: int, 
+    match_in: schemas.FriendlyMatchCreate, 
+    db: Session = Depends(get_db), 
+    current_user_id: int = Depends(get_current_user_id)
+):
+    # 1. Seguridad: Verificar que el usuario del token sea el mismo que intenta crear el partido
+    if current_user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to create matches for another user.",
+        )
+
+    # 2. Llamar a la logica de negocio y manejar excepciones (ya sin validar user_id en el body)
+    try:
+        return utils.create_friendly_match(db, user_id, match_in)
+        
+    except schemas.UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found."
+        )
+    except schemas.TeamNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Team not found or does not belong to the user."
+        )
+    except schemas.InvalidDurationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except schemas.TeamIncompleteError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Team incomplete, must have exactly 3 starters."
+        )
+    except schemas.CreateMatchError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Conflict in match creation."
+        )
+
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='0.0.0.0', port=8000)

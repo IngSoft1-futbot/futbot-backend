@@ -678,3 +678,129 @@ def test_get_players_hace_una_consulta_a_la_base(db, repo_mock):
     utils.get_players(db, 1)
 
     repo_mock.get_players.assert_called_once_with(db, 1)
+
+# ----------------- Friendly Matches -----------------
+ 
+def make_friendly_match_in(team_name="Mi Equipo", match_duration=3, user_id=1):
+    return schemas.FriendlyMatchCreate(
+        user_id= user_id,          
+        team_name=team_name,
+        match_duration=match_duration,
+    )
+
+# ----------------- check_friendly_match_duration -----------------
+
+@pytest.mark.parametrize("duration", [1, 2, 3, 4, 5])
+def test_check_friendly_match_duration_ok(duration):
+    utils.check_friendly_match_duration(duration)  # no lanza
+
+
+@pytest.mark.parametrize("duration", [-2 , 6, 0, -1, 10])
+def test_check_friendly_match_duration_invalida(duration):
+    with pytest.raises(schemas.InvalidDurationError):
+        utils.check_friendly_match_duration(duration)
+
+
+# --------------------- check_friendly_team ---------------------
+
+def test_check_friendly_team_ok():
+    team = SimpleNamespace(
+        team_id=1,
+        players=[
+            make_player(7, is_starter=True),
+            make_player(8, is_starter=True),
+            make_player(9, is_starter=True),
+            make_player(10, is_starter=False),
+        ]
+    )
+    assert utils.check_friendly_team(team) == 1
+
+
+def test_check_friendly_team_no_existe():
+    with pytest.raises(schemas.TeamNotFoundError):
+        utils.check_friendly_team(None)
+
+
+@pytest.mark.parametrize("starters_count", [0, 1, 2, 4])
+def test_check_friendly_team_titulares_incorrectos(starters_count):
+    team = SimpleNamespace(
+        team_id=1,
+        players=[make_player(i, is_starter=(i < starters_count + 7)) for i in range(7, 7 + starters_count)]
+    )
+    with pytest.raises(schemas.TeamIncompleteError):
+        utils.check_friendly_team(team)
+
+
+# --------------------- create_friendly_match ---------------------
+
+@pytest.fixture
+def repo_friendly(repo_mock):
+    """Repository configurado para el camino optimo de create_friendly_match."""
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_team_by_owner_and_name.return_value = SimpleNamespace(
+        team_id=1,
+        players=[
+            make_player(7, is_starter=True),
+            make_player(8, is_starter=True),
+            make_player(9, is_starter=True),
+        ]
+    )
+    repo_mock.create_match.return_value = SimpleNamespace(match_id=10, is_friendly=True)
+    return repo_mock
+
+
+def test_create_friendly_match_ok(db, repo_friendly):
+    result = utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+    assert result.match_id == 10
+    assert result.is_friendly is True
+    repo_friendly.create_match.assert_called_once()
+
+
+def test_create_friendly_match_duracion_invalida_falla_rapido(db, repo_friendly):
+    with pytest.raises(schemas.InvalidDurationError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in(match_duration=10))
+
+    repo_friendly.get_user.assert_not_called()
+    repo_friendly.create_match.assert_not_called()
+
+
+def test_create_friendly_match_usuario_inexistente(db, repo_friendly):
+    repo_friendly.get_user.return_value = None
+
+    with pytest.raises(schemas.UserNotFoundError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+    repo_friendly.create_match.assert_not_called()
+
+
+def test_create_friendly_match_equipo_inexistente(db, repo_friendly):
+    repo_friendly.get_team_by_owner_and_name.return_value = None
+
+    with pytest.raises(schemas.TeamNotFoundError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+    repo_friendly.create_match.assert_not_called()
+
+
+def test_create_friendly_match_equipo_incompleto(db, repo_friendly):
+    # Solo 2 titulares en lugar de 3
+    repo_friendly.get_team_by_owner_and_name.return_value = SimpleNamespace(
+        team_id=1,
+        players=[
+            make_player(7, is_starter=True),
+            make_player(8, is_starter=True),
+        ]
+    )
+
+    with pytest.raises(schemas.TeamIncompleteError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+    repo_friendly.create_match.assert_not_called()
+
+
+def test_create_friendly_match_integrity_error_se_traduce(db, repo_friendly):
+    repo_friendly.create_match.side_effect = IntegrityError("INSERT", {}, Exception("error"))
+
+    with pytest.raises(schemas.CreateMatchError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in())

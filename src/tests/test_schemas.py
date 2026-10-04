@@ -233,3 +233,35 @@ def test_player_out_acepta_pacss_ya_anidado():
 
     assert out.behavior_id == 0      # default
     assert out.team_id is None
+
+# --------------   TESTS DE PARTIDOS AMISTOSOS   --------------
+ 
+FRIENDLY_MATCH = {
+    "team_name": "Mi Equipo",
+    "match_duration": 3,
+}
+ 
+ 
+def test_friendly_match_create_valido():
+    match_in = schemas.FriendlyMatchCreate(**FRIENDLY_MATCH)
+ 
+    assert match_in.team_name == "Mi Equipo"
+    assert match_in.match_duration == 3
+ 
+ 
+@pytest.mark.parametrize("campo", ["team_name", "match_duration"])
+def test_friendly_match_create_falta_campo_obligatorio(campo):
+    data = {k: v for k, v in FRIENDLY_MATCH.items() if k != campo}
+ 
+    with pytest.raises(ValidationError):
+        schemas.FriendlyMatchCreate(**data)
+ 
+ 
+@pytest.mark.parametrize("campo, valor_invalido", [
+    ("match_duration", "tres"),
+])
+def test_friendly_match_create_tipos_invalidos(campo, valor_invalido):
+    data = {**FRIENDLY_MATCH, campo: valor_invalido}
+ 
+    with pytest.raises(ValidationError):
+        schemas.FriendlyMatchCreate(**data)
