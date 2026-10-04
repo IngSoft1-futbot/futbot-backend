@@ -455,7 +455,6 @@ FAKE_FRIENDLY_MATCH = {
 }
 
 FRIENDLY_MATCH_BODY = {
-    "user_id": 1,  
     "team_name": "Mi Equipo",
     "match_duration": 3,
 }
@@ -493,7 +492,7 @@ def test_create_friendly_match_errores_de_negocio(client, utils_mock, error, sta
     assert r.json()["detail"] == detail
 
 
-@pytest.mark.parametrize("campo", ["user_id", "team_name", "match_duration"])
+@pytest.mark.parametrize("campo", ["team_name", "match_duration"])
 def test_create_friendly_match_falta_campo_obligatorio(client, utils_mock, campo):
     body = {k: v for k, v in FRIENDLY_MATCH_BODY.items() if k != campo}
 
@@ -504,19 +503,11 @@ def test_create_friendly_match_falta_campo_obligatorio(client, utils_mock, campo
 
 
 def test_create_friendly_match_token_de_otro_usuario(client, utils_mock):
-    # El fixture del cliente inyecta por defecto el current_user_id = 1
-    # Intentamos crear el amistoso en la ruta del usuario 2 con su respectivo body
-    r = client.post("/users/2/friendly-matches", json={**FRIENDLY_MATCH_BODY, "user_id": 2})
+    # Como ya no hay user_id en el body, pasamos directamente FRIENDLY_MATCH_BODY limpio
+    r = client.post("/users/2/friendly-matches", json=FRIENDLY_MATCH_BODY)
 
     assert r.status_code == 403
     assert r.json()["detail"] == "Not allowed to create matches for another user."
     utils_mock.create_friendly_match.assert_not_called()
 
 
-def test_create_friendly_match_mismatch_body_y_path(client, utils_mock):
-    # Intentamos crearlo en la ruta del usuario 1, pero el body dice user_id = 2
-    r = client.post("/users/1/friendly-matches", json={**FRIENDLY_MATCH_BODY, "user_id": 2})
-
-    assert r.status_code == 400
-    assert r.json()["detail"] == "User ID in body does not match User ID in path."
-    utils_mock.create_friendly_match.assert_not_called()
