@@ -180,3 +180,63 @@ Ejemplo: current_user_id: int = Depends(get_current_user_id)
 **Propietario**: el jugador pertenece al usuario que hace la request; solo ese usuario puede usarlo en equipos.
 **Comportamiento**: todo jugador nuevo recibe behavior_id = 0 (default); puede cambiar cuando se asigna a un equipo.
 **Equipo**: inicialmente null; se asigna cuando se crea un equipo que incluya al jugador.
+
+
+## Crear partido amistoso
+
+`POST /users/{user_id}/friendly-matches` Crea un partido amistoso y lo deja en estado "open" (esperando rival) utilizando un equipo especifico del creador como equipo local (`home_team`). Requiere token Bearer. Para evitar manipulaciones, el `user_id` autenticado en el token, el de la ruta URL y el provisto en el JSON deben coincidir exactamente.
+
+### Payload
+```json
+{
+  "user_id": 1,
+  "team_name": "Mi Equipo",
+  "match_duration": 3
+}
+
+.user_id: ID del usuario creador (debe coincidir con la URL).
+.team_name: Nombre exacto del equipo local (debe pertenecer al usuario).
+.match_duration: Duración de cada cuarto del partido en minutos (estrictamente entre 1 y 5).
+
+### Recorrido
+
+1.**app.py**: Pydantic valida la estructura de los datos (422 si falta un campo o tipo). Verifica   que el token sea válido (401). Confirma que el creador autenticado coincida con la ruta URL (403) y con el user_id enviado en el cuerpo de la petición (400).
+
+2.utils.py (create_friendly_match):
+
+  -Verifica que el usuario exista en la base de datos.
+
+  -Busca el equipo usando el team_name y asegurando que pertenezca al user_id.
+
+  -Valida la regla de negocio de la duración por cuarto (1 a 5 minutos).
+
+  -Chequea la integridad del equipo local, exigiendo que tenga exactamente 3 jugadores titulares.
+
+3.product_repository.py (create_match): Inserta el registro en la tabla matches forzando los valores automáticos para un amistoso público (is_friendly=True, status="open", away_team_id=None, is_private=False, password=None). Si hay un error de base de datos, hace rollback.
+
+4.app.py: Retorna un código HTTP 201 devolviendo los detalles completos del partido creado.
+
+### Respuesta:
+
+Código	  Cuando	  detail
+201	  Partido creado	  FriendlyMatchOut: id_match, is_friendly, status, home_team_id, away_team_id, match_duration, etc.
+400	  Mismatch de User ID	  User ID in body does not match User ID in path.
+400	  Duración fuera de rango	  Match duration must be between 1 and 5 minutes.
+400	  Equipo sin 3 titulares	  Team incomplete, must have exactly 3 starters.
+401	  Token inválido / ausente	  Could not validate credentials.
+403	  Crear a nombre de otro	  Not allowed to create matches for another user.
+404	  Usuario no existe	User not found.
+404	  Equipo ajeno o no existe	  Team not found or does not belong to the user.
+409	  Duplicado / Conflicto DB	  Conflict in match creation.
+422	  Estructura inválida	  Lista de Pydantic.
+
+
+### Reglas
+
+-Duracion: Estrictamente limitada a valores entre 1 y 5 minutos por cuarto (enviado a traves del campo match_duration).
+
+-Estado inicial: Todo amistoso nace con estado open y con el equipo visitante (away_team_id) vacio, esperando que otro jugador se una a la sala.
+
+-Validacion de Plantel: No basta con que el equipo exista, se verifica activamente en el momento de creacion del partido que el equipo cuente de manera integra con sus 3 jugadores titulares listos para jugar.
+
+-Detalle: esta implementacion tiene en consideracion solo que los amistosos sean publicos, en proximas actualizaciones se podra incluir distincion entre amistosos publicos y privados
