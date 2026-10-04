@@ -72,6 +72,26 @@ class PlayerOut(BaseModel):
     team_id: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)  # permite leer desde el ORM
 
+class PlayerInGame(BaseModel):
+    player_id: int
+    name: str
+    shirt_number: int
+    pacss_attributes: PacssAttributes
+    team: str
+    coordinates_x: float
+    coordinates_y: float
+    movement_speed_percentage: int = 0
+    kick_countdown: int = 0
+
+
+class Ball(BaseModel):
+    pos_x: float
+    pos_y: float
+    velocity: float
+    direction_x: float
+    direction_y: float
+    owner_id: Optional[int] = None
+
 #----------------------Teams schemas-----------------------
 class PlayerAssignment(BaseModel):
     player_id: int
