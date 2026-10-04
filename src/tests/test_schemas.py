@@ -214,14 +214,61 @@ def test_player_in_atributo_faltante():
         schemas.PlayerIn(**data)
 
 
-# ---------- PlayerOut ----------
-
 def test_player_out_se_construye_desde_un_objeto_orm():
-        orm_player = SimpleNamespace(
-        player_id=7, name="Lionel Messi", shirt_number=10, behavior_id=0,
-        team_id=None, owner_id=1,                  # owner_id sobra: se ignora
-        power=90, agility=95, control=60, speed=30, strength=25,
+    orm_player = SimpleNamespace(
+        player_id=7,
+        name="Lionel Messi",
+        shirt_number=10,
+        behavior_id=0,
+        team_id=None,
+        owner_id=1,  # campo extra: se ignora
+        pacss_attributes={
+            "power": 90,
+            "agility": 95,
+            "control": 60,
+            "speed": 30,
+            "strength": 25,
+        },
     )
+
+    out = schemas.PlayerOut.model_validate(orm_player)
+
+    assert out.model_dump() == {
+        "player_id": 7,
+        "name": "Lionel Messi",
+        "shirt_number": 10,
+        "behavior_id": 0,
+        "pacss_attributes": {
+            "power": 90,
+            "agility": 95,
+            "control": 60,
+            "speed": 30,
+            "strength": 25,
+        },
+        "team_id": None,
+    }
+ 
+
+# --------------   TESTS DE AMISTOSOS   --------------
+
+def test_friendly_match_out_se_construye_desde_un_objeto_orm():
+    orm_match = SimpleNamespace(
+        id_match=1, home_team_id=3, match_duration=10, is_private=True,
+        away_team_id=None, status="open", password="secreta",   # atributos de mas: se ignoran
+    )
+
+    out = schemas.GETFriendlyMatchOut.model_validate(orm_match)
+
+    assert out.model_dump() == {
+        "id_match": 1, "home_team_id": 3, "match_duration": 10, "is_private": True,
+    }
+
+
+def test_friendly_match_out_exige_la_duracion():
+    orm_match = SimpleNamespace(id_match=1, home_team_id=3, match_duration=None, is_private=False)
+
+    with pytest.raises(ValidationError):
+        schemas.GETFriendlyMatchOut.model_validate(orm_match)
 
 
 def test_player_out_acepta_pacss_ya_anidado():

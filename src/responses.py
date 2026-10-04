@@ -318,3 +318,20 @@ CREATE_FRIENDLY_MATCH_RESPONSES = {
         }
     }
 }
+
+
+GET_FRIENDLY_MATCHES_RESPONSES = {
+    500: {
+        "description": "Internal Server Error",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "internal_error": {
+                        "summary": "Could not retrieve the available friendly matches",
+                        "value": {"detail": "Internal Server Error"}
+                    }
+                }
+            }
+        }
+    }
+}

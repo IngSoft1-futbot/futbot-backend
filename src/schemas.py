@@ -133,6 +133,18 @@ class TeamNameAlreadyInUseError(Exception):         #400
 class CreateTeamError(Exception):         #409 condicion de carrera
     pass
 
+#----------------Matches schemas-----------------------
+class GETFriendlyMatchOut(BaseModel):
+    id_match: int
+    home_team_id: int
+    match_duration: int
+    is_private: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+class FriendlyMatchesError(Exception):         #500
+    pass
+
 class InvalidDurationError(Exception):         #400
     pass
 

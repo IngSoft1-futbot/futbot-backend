@@ -245,6 +245,22 @@ def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depend
             detail="Conflict in creation time."
         )
 
+@app.get(
+    "/friendly-matches",
+    response_model=list[schemas.GETFriendlyMatchOut],
+    status_code=status.HTTP_200_OK,
+    tags=["Friendly Matches"],
+    responses=responses.GET_FRIENDLY_MATCHES_RESPONSES
+)
+def get_friendly_matches(db: Session = Depends(get_db)):
+    try:
+        return utils.get_available_friendly_matches(db)
+    except schemas.FriendlyMatchesError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving teams."
+        )
+
 @app.post(
     "/users/{user_id}/friendly-matches",
     response_model=schemas.FriendlyMatchOut,

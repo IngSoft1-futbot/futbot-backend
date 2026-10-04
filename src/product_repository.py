@@ -161,3 +161,11 @@ def create_match(
         raise
     db.refresh(match)
     return match
+
+def get_open_friendly_matches(db: Session) -> list[models.Match]:
+    return (
+        db.query(models.Match)
+        .filter(models.Match.is_friendly.is_(True), models.Match.status == "open")
+        .order_by(models.Match.id_match)
+        .all()
+    )
