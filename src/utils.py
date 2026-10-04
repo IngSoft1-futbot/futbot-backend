@@ -1,16 +1,16 @@
 import os
 import jwt
 import bcrypt
-
-
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
 from . import product_repository as repo
 from . import schemas
+
 DEFAULT_BEHAVIOR_ID = 0
 
 SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("Falta la variable de entorno SECRET_KEY. Definila antes de arrancar la app (make env la genera).")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 def password_validation(password: str):
@@ -106,8 +106,9 @@ def verify_jwt_token(token: str) -> int:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
         return user_id
-    except jwt.PyJWTError:
-        raise schemas.InvalidTokenError("User not authoriced.")
+    except (jwt.PyJWTError, TypeError, ValueError):
+        # PyJWTError: firma/formato invalido. TypeError: falta "sub". ValueError: "sub" no numerico.
+        raise schemas.InvalidTokenError("User not authorized.")
 
 #-----------------Crear Jugador-----------------------
 
@@ -137,7 +138,7 @@ def check_composition_and_duplicated(team_in: schemas.TeamCreate):      # compos
     num_titulares = len(team_in.jugadores_titulares)
     num_suplentes =len(team_in.jugadores_suplentes)
     
-    if not (num_titulares == 3 and num_suplentes == 3): # revisa 3 titulares y 3 jugadores en total
+    if not (num_titulares == 3 and num_suplentes == 3): # revisa 3 titulares y 3 suplentes
         raise schemas.TeamIncompleteError()
     
     ids = [p.player_id for p in team_in.jugadores_titulares + team_in.jugadores_suplentes]

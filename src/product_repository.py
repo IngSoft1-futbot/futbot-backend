@@ -2,7 +2,7 @@ from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import models
+from . import models, schemas
 
 
 def get_user_by_email(db: Session, *, email: str) -> Optional[models.User]:
@@ -45,7 +45,13 @@ def get_user(db: Session, user_id: int) -> Optional[models.User]:
 
 
 def get_players_by_ids(db: Session, *, ids: list[int]) -> list[models.Player]:
-    return db.query(models.Player).filter(models.Player.player_id.in_(ids)).all()
+    return (
+        db.query(models.Player)
+        .filter(models.Player.player_id.in_(ids))
+        .order_by(models.Player.player_id)
+        .with_for_update()
+        .all()
+    )
 
 
 def get_behaviors_by_ids(db: Session, *, ids: list[int]) -> list[models.Behavior]:
@@ -93,17 +99,18 @@ def add_team(
     return team
 
 
-def create_player(db: Session, user_id: int, player: models.Player) -> models.Player:
+def create_player(db: Session, user_id: int, player: schemas.PlayerIn) -> models.Player:
 
+    pacss = player.pacss_attributes
     p = models.Player(
         name=player.name,
         owner_id=user_id,
         shirt_number=player.shirt_number,
-        power=player.power,
-        agility=player.agility,
-        control=player.control,
-        speed=player.speed,
-        strength=player.strength,
+        power=pacss.power,
+        agility=pacss.agility,
+        control=pacss.control,
+        speed=pacss.speed,
+        strength=pacss.strength,
     )
 
     db.add(p)
