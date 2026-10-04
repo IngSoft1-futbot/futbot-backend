@@ -1,6 +1,6 @@
 from unittest.mock import patch
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -408,3 +408,40 @@ def test_create_player_shirt_number_limites(db):
 
     assert p1.shirt_number == 1
     assert p99.shirt_number == 99
+
+# --------------   TESTS DE PARTIDOS AMISTOSOS   --------------
+
+def make_match(db, home_team_id, is_friendly=True, match_duration=3, status="open"):
+    return repo.create_match(
+        db,
+        is_friendly=is_friendly,
+        status=status,
+        home_team_id=home_team_id,
+        away_team_id=None,
+        match_duration=match_duration,
+        is_private=False,
+        password=None,
+        current_period=0,
+        league_id=None,
+        scheduled_at=None,
+    )
+
+
+def test_create_match_friendly_lo_guarda(db, usuario_con_jugadores):
+    # 1. Creamos un equipo valido en la base para poder asociarlo al partido
+    team = repo.add_team(
+        db, owner_id=usuario_con_jugadores.id, name="Mi Equipo",
+        starters=[(7, 0), (8, 0), (9, 0)],
+        substitutes=[(10, 0), (11, 0), (12, 0)],
+    )
+
+    # 2. Creamos el partido amistoso usando el repositorio
+    match = make_match(db, home_team_id=team.team_id, match_duration=3)
+
+    # 3. Verificaciones en la base de datos real de pruebas
+    assert match.id_match is not None
+    assert match.is_friendly is True
+    assert match.home_team_id == team.team_id
+    assert match.match_duration == 3
+    assert match.status == "open"
+    assert db.query(models.Match).count() == 1  
