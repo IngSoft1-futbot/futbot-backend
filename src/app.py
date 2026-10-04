@@ -264,15 +264,8 @@ def create_friendly_match(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not allowed to create matches for another user.",
         )
-        
-    # 2. Verificar body vs path (opcional pero recomendado para consistencia)
-    if match_in.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User ID in body does not match User ID in path.",
-        )
 
-    # 3. Llamar a la logica de negocio y manejar excepciones
+    # 2. Llamar a la logica de negocio y manejar excepciones (ya sin validar user_id en el body)
     try:
         return utils.create_friendly_match(db, user_id, match_in)
         
@@ -289,7 +282,7 @@ def create_friendly_match(
     except schemas.InvalidDurationError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e) # Retorna el mensaje exacto: "Match duration must be between 1 and 5 minutes."
+            detail=str(e)
         )
     except schemas.TeamIncompleteError:
         raise HTTPException(

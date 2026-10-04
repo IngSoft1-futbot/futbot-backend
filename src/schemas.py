@@ -93,7 +93,6 @@ class TeamOut(BaseModel):
 #---------------------- Friendly Matches schemas -----------------------
 
 class FriendlyMatchCreate(BaseModel):
-    user_id: int
     team_name: str
     match_duration: int
 
