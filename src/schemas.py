@@ -1,12 +1,12 @@
-import pydantic.config
-from sqlalchemy import null
 from datetime import datetime
 from typing import Optional, Annotated
-from pydantic import BaseModel, ConfigDict, EmailStr, StringConstraints,Field
+from pydantic import BaseModel, ConfigDict, EmailStr, StringConstraints, Field
 
 Club = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=50)]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20)]
 TeamName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=30)]
+PlayerName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]  # columna String(50)
+ShirtNumber = Annotated[int, Field(ge=1, le=99)]
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -22,7 +22,7 @@ class UserCreate(BaseModel):
     name: Name
     email: EmailStr
     password: str
-    avatar: Optional[str] = None
+    avatar: Optional[str] = Field(default=None, max_length=255)  # columna String(255)
 
 class UserOut(BaseModel):
     id: int
@@ -32,16 +32,16 @@ class UserOut(BaseModel):
     avatar: Optional[str]
     created_at: datetime
 
-    model_config: pydantic.config.ConfigDict = ConfigDict(from_attributes=True)  # permite leer desde el ORM
+    model_config = ConfigDict(from_attributes=True)  # permite leer desde el ORM
 
 class RegistrationError(Exception):
-    pass  # {HTTPERROR} 400
+    pass  # {HTTPERROR} 409 (conflicto al registrar, p. ej. carrera entre dos registros)
 class EmailAlreadyExistsError(RegistrationError):
-    pass  # {HTTPERROR} 409
+    pass  # {HTTPERROR} 400
 class PasswordValidationError(RegistrationError):
     pass  # {HTTPERROR} 400
 class ClubAlreadyExistsError(RegistrationError):
-    pass  # {HTTPERROR} 409
+    pass  # {HTTPERROR} 400
 
 """ PacssAttributes Schema """
 
@@ -59,10 +59,9 @@ class PointAssignmentError(Exception):
 """ Player Schema """
 
 class PlayerIn(BaseModel):
-    name: str
-    shirt_number: int
+    name: PlayerName
+    shirt_number: ShirtNumber
     pacss_attributes: PacssAttributes
-    team_id: Optional[int] = None
 
 class PlayerOut(BaseModel):
     player_id: int
@@ -72,27 +71,6 @@ class PlayerOut(BaseModel):
     pacss_attributes: PacssAttributes
     team_id: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)  # permite leer desde el ORM
-    
-    
-""" User Login Schema """
-
-class UserLoginIn(BaseModel):
-    email: EmailStr
-    password: str
-
-class UserLoginOut(BaseModel):
-    accessToken: str
-    tokenType: str
-
-
-class PlayerLoginError(Exception):  # {HTTPERROR} 401
-    pass
-
-class BadCredentials(PlayerLoginError):  # {HTTPERROR} 401
-    pass
-
-class Fobbiden(PlayerLoginError):  # {HTTPERROR} 403
-    pass
 
 #----------------------Teams schemas-----------------------
 class PlayerAssignment(BaseModel):

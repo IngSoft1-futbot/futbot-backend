@@ -1,4 +1,3 @@
-from src import product_repository
 from fastapi.responses import JSONResponse
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -94,7 +93,7 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Conflict in register time.",
         )
 
-@app.post("/auth/login/", tags=["Users"], responses=responses.LOGIN_RESPONSES) 
+@app.post("/auth/login", tags=["Users"], responses=responses.LOGIN_RESPONSES) 
 def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_header: HTTPAuthorizationCredentials | None = Depends(security_optional)):
 
     if auth_header:
@@ -135,24 +134,27 @@ def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_
     }
 
 @app.get(
-    "/users/{user_id}/players", tags=["Players"]
-    )
-def get_player(user_id: int, db: Session = Depends(get_db),current_user_id: int = Depends(get_current_user_id)):
-    
+    "/users/{user_id}/players",
+    response_model=list[schemas.PlayerOut],
+    tags=["Players"],
+    responses=responses.GET_PLAYERS_RESPONSES
+)
+def get_players(user_id: int, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
+ 
     if current_user_id != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not allowed to players for another user.",
-            )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to view players of another user.",
+        )
     try:
         return utils.get_players(db, user_id)
     except schemas.UserNotFoundError:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User could not be found."
-            )
-        
-
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User could not be found."
+        )
+ 
+ 
 @app.post(
     "/users/{user_id}/players",
     response_model=schemas.PlayerOut,
@@ -160,12 +162,12 @@ def get_player(user_id: int, db: Session = Depends(get_db),current_user_id: int 
     tags=["Players"],
     responses=responses.CREATE_PLAYER_RESPONSES
 )
-def create_player (user_id: int, player_in: schemas.PlayerIn, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
-
+def create_player(user_id: int, player_in: schemas.PlayerIn, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
+ 
     if current_user_id != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not allowed to players for another user.",
+            detail="Not allowed to create players for another user.",
         )
     try:
         return utils.create_player(db, user_id, player_in)
