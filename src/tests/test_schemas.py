@@ -183,15 +183,53 @@ def test_schema_no_valida_la_composicion_del_equipo():
     assert team.jugadores_suplentes == []
  
  
+# ---------- PlayerIn ----------
+
+PLAYER_IN = {
+    "name": "Jugador",
+    "shirt_number": 10,
+    "pacss_attributes": {"power": 60, "agility": 60, "control": 60,
+                         "speed": 60, "strength": 60},
+}
+
+
+def test_player_in_valido():
+    p = schemas.PlayerIn(**PLAYER_IN)
+
+    assert p.shirt_number == 10
+
+
+@pytest.mark.parametrize("campo", ["name", "shirt_number", "pacss_attributes"])
+def test_player_in_falta_campo_obligatorio(campo):
+    data = {k: v for k, v in PLAYER_IN.items() if k != campo}
+
+    with pytest.raises(ValidationError):
+        schemas.PlayerIn(**data)
+
+
+def test_player_in_atributo_faltante():
+    data = {**PLAYER_IN, "pacss_attributes": {"power": 60, "agility": 60}}
+
+    with pytest.raises(ValidationError):
+        schemas.PlayerIn(**data)
+
+
 # ---------- PlayerOut ----------
- 
+
 def test_player_out_se_construye_desde_un_objeto_orm():
-    orm_player = SimpleNamespace(
-        player_id=7, name="Lionel Messi", behavior_id=0,
-        owner_id=1, power=90, agility=95,   # atributos de mas: se ignoran
+        orm_player = SimpleNamespace(
+        player_id=7, name="Lionel Messi", shirt_number=10, behavior_id=0,
+        team_id=None, owner_id=1,                  # owner_id sobra: se ignora
+        power=90, agility=95, control=60, speed=30, strength=25,
     )
- 
-    out = schemas.PlayerOut.model_validate(orm_player)
- 
-    assert out.model_dump() == {"player_id": 7, "name": "Lionel Messi", "behavior_id": 0}
- 
+
+
+def test_player_out_acepta_pacss_ya_anidado():
+    out = schemas.PlayerOut(
+        player_id=7, name="X", shirt_number=10,
+        pacss_attributes=schemas.PacssAttributes(
+            power=60, agility=60, control=60, speed=60, strength=60),
+    )
+
+    assert out.behavior_id == 0      # default
+    assert out.team_id is None

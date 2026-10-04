@@ -1,4 +1,5 @@
-#solo como documentacion para manejo con swagger, no se usa en el codigo
+# Documentacion de respuestas para Swagger: se pasa en `responses=` de cada ruta en app.py.
+# Los mensajes tienen que coincidir con los `detail` que devuelve app.py.
 
 REGISTER_RESPONSES = {
     400: {
@@ -49,8 +50,8 @@ CREATE_TEAM_RESPONSES = {
                         "value": {"detail": "Team name already in use for this user."}
                     },
                     "team_incomplete": {
-                        "summary": "Team incomplete, must be 3 starters & 3 subtitutes",
-                        "value": {"detail": "Team incomplete, must be 3 starters & 3 subtitutes."}
+                        "summary": "Team incomplete, must be 3 starters & 3 substitutes",
+                        "value": {"detail": "Team incomplete, must be 3 starters & 3 substitutes."}
                     },
                     "player_in_use":{
                         "summary": "Some players are already in use",
@@ -86,7 +87,7 @@ CREATE_TEAM_RESPONSES = {
                         "summary": "User is not the owner of the player",
                         "value": {"detail": "User is not the owner of the player."}
                     },
-                    "behavior_not owner": {
+                    "behavior_not_owner": {
                         "summary": "User is not the owner of the behavior",
                         "value": {"detail": "User is not the owner of the behavior."}
                     }
@@ -147,4 +148,93 @@ LOGIN_RESPONSES = {
             }
         }
     }
+}
+
+CREATE_PLAYER_RESPONSES = {
+    400: {
+        "description": "Bad request",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "invalid_points": {
+                        "summary": "Points must total 300, each between 20 and 100",
+                        "value": {"detail": "Points must total 300, each between 20 and 100."}
+                    }
+                }
+            }
+        },
+    },
+    401: {
+    "description": "Unauthorized",
+    "content": {
+        "application/json": {
+            "examples": {
+                "invalid_token": {
+                    "summary": "Invalid or missing token",
+                    "value": {"detail": "Could not validate credentials."}
+                    }
+                }
+            }
+        }
+    },
+    403: {
+        "description": "Forbidden",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "user_not_owner": {
+                        "summary": "Not allowed to create players for another user",
+                        "value": {"detail": "Not allowed to create players for another user."}
+                    }
+                }
+            }
+        }
+    },
+    404:{
+        "description": "Not Found",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "user_not_found":{
+                        "summary": "User could not be found.",
+                        "value": {"detail": "User could not be found."}
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+# El login rechaza a quien ya manda un token valido (ver app.py)
+LOGIN_RESPONSES[400] = {
+    "description": "Bad request",
+    "content": {
+        "application/json": {
+            "examples": {
+                "active_token": {
+                    "summary": "Already has an active token",
+                    "value": {"detail": "Ya posees un token activo. No puedes volver a iniciar sesion."}
+                }
+            }
+        }
+    },
+}
+
+GET_PLAYERS_RESPONSES = {
+    401: CREATE_PLAYER_RESPONSES[401],
+    403: {
+        "description": "Forbidden",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "user_not_owner": {
+                        "summary": "Not allowed to view players of another user",
+                        "value": {"detail": "Not allowed to view players of another user."}
+                    }
+                }
+            }
+        }
+    },
+    404: CREATE_PLAYER_RESPONSES[404],
 }

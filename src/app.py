@@ -1,3 +1,4 @@
+from fastapi.responses import JSONResponse
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,7 +10,6 @@ from contextlib import asynccontextmanager
 
 from . import schemas, utils, responses
 from .database import get_db, init_db
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -93,7 +93,7 @@ def register(user_in: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Conflict in register time.",
         )
 
-@app.post("/auth/login/", tags=["Users"], responses=responses.LOGIN_RESPONSES) 
+@app.post("/auth/login", tags=["Users"], responses=responses.LOGIN_RESPONSES) 
 def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_header: HTTPAuthorizationCredentials | None = Depends(security_optional)):
 
     if auth_header:
@@ -133,6 +133,55 @@ def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db),auth_
         "message": "Login successful."
     }
 
+@app.get(
+    "/users/{user_id}/players",
+    response_model=list[schemas.PlayerOut],
+    tags=["Players"],
+    responses=responses.GET_PLAYERS_RESPONSES
+)
+def get_players(user_id: int, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
+ 
+    if current_user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to view players of another user.",
+        )
+    try:
+        return utils.get_players(db, user_id)
+    except schemas.UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User could not be found."
+        )
+ 
+ 
+@app.post(
+    "/users/{user_id}/players",
+    response_model=schemas.PlayerOut,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Players"],
+    responses=responses.CREATE_PLAYER_RESPONSES
+)
+def create_player(user_id: int, player_in: schemas.PlayerIn, db: Session = Depends(get_db), current_user_id: int = Depends(get_current_user_id)):
+ 
+    if current_user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to create players for another user.",
+        )
+    try:
+        return utils.create_player(db, user_id, player_in)
+    except schemas.UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User could not be found."
+        )
+    except schemas.PointAssignmentError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Points must total 300, each between 20 and 100."
+        )
+    
 
 @app.post(
     "/users/{user_id}/teams",
@@ -199,4 +248,3 @@ def create_team (user_id: int, team_in: schemas.TeamCreate, db: Session = Depend
 if __name__ == '__main__':
     import uvicorn
     uvicorn.run(app, host='0.0.0.0', port=8000)
-

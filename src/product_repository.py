@@ -2,26 +2,16 @@ from typing import Optional
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import models
+from . import models, schemas
 
-#-----------------USERS-----------------------
-def get_user_by_email(
-    db: Session, *, email: str
-) -> Optional[models.User]:
-    return (
-        db.query(models.User)
-        .filter(models.User.email == email)
-        .first()
-    )
 
-def get_user_by_club(
-    db: Session, *, club: str
-) -> Optional[models.User]:
-    return (
-        db.query(models.User)
-        .filter(models.User.club == club)
-        .first()
-    )
+def get_user_by_email(db: Session, *, email: str) -> Optional[models.User]:
+    return db.query(models.User).filter(models.User.email == email).first()
+
+
+def get_user_by_club(db: Session, *, club: str) -> Optional[models.User]:
+    return db.query(models.User).filter(models.User.club == club).first()
+
 
 def create_user(
     db: Session,
@@ -47,13 +37,21 @@ def create_user(
         raise
     db.refresh(user)
     return user
-#-----------------TEAMS-----------------------
+
+
+# -----------------TEAMS-----------------------
 def get_user(db: Session, user_id: int) -> Optional[models.User]:
     return db.get(models.User, user_id)
 
 
 def get_players_by_ids(db: Session, *, ids: list[int]) -> list[models.Player]:
-    return db.query(models.Player).filter(models.Player.player_id.in_(ids)).all()
+    return (
+        db.query(models.Player)
+        .filter(models.Player.player_id.in_(ids))
+        .order_by(models.Player.player_id)
+        .with_for_update()
+        .all()
+    )
 
 
 def get_behaviors_by_ids(db: Session, *, ids: list[int]) -> list[models.Behavior]:
@@ -69,6 +67,7 @@ def get_team_by_owner_and_name(
         .first()
     )
 
+
 def add_team(
     db: Session,
     *,
@@ -77,10 +76,9 @@ def add_team(
     starters: list[tuple[int, int]],
     substitutes: list[tuple[int, int]],
 ) -> models.Team:
-    assignments = (
-        [(pid, bid, True) for pid, bid in starters]
-        + [(pid, bid, False) for pid, bid in substitutes]
-    )
+    assignments = [(pid, bid, True) for pid, bid in starters] + [
+        (pid, bid, False) for pid, bid in substitutes
+    ]
 
     try:
         team = models.Team(owner_id=owner_id, name=name)
@@ -99,3 +97,31 @@ def add_team(
 
     db.refresh(team)
     return team
+
+
+def create_player(db: Session, user_id: int, player: schemas.PlayerIn) -> models.Player:
+
+    pacss = player.pacss_attributes
+    p = models.Player(
+        name=player.name,
+        owner_id=user_id,
+        shirt_number=player.shirt_number,
+        power=pacss.power,
+        agility=pacss.agility,
+        control=pacss.control,
+        speed=pacss.speed,
+        strength=pacss.strength,
+    )
+
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+
+    return p
+
+def get_players(db: Session, user_id: int) -> list[models.Player]:
+    return (
+            db.query(models.Player)
+            .filter(models.Player.owner_id == user_id)
+            .all()
+        )

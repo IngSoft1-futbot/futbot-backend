@@ -121,3 +121,62 @@ Ejemplo: current_user_id: int = Depends(get_current_user_id)
 **Nombre**: 3 a 30 caracteres, unico por usuario. 
 **Plantel**: 3 titulares y 3 suplentes, sin repetidos. Un jugador solo puede estar en un equipo. 
 **Behavior**: opcional; sin behavior se usa el default (id 0).
+
+
+
+
+
+
+
+
+
+
+## Crear jugador
+
+`POST /users/{user_id}/players` Crea un jugador con atributos PACSS (Power, Agility, Control, Speed, Strength) que suman exactamente 300 puntos, cada uno entre 20 y 100. El jugador se asigna al usuario autenticado y recibe un behavior_id por defecto (0). Requiere token Bearer y el `user_id` de la ruta tiene que ser el del usuario autenticado.
+
+### Payload
+```json
+{
+  "name": "Lionel Messi",
+  "shirt_number": 10,
+  "pacss_attributes": {
+    "power": 60,
+    "agility": 80,
+    "control": 75,
+    "speed": 70,
+    "strength": 15
+  }
+}
+```
+
+* name: nombre del jugador (requerido).
+* shirt_number: número de camiseta 0-99 (requerido).
+* pacss_attributes: objeto con los 5 atributos. Cada uno entre 20 y 100, suma total exactamente 300 (requerido).
+
+### Recorrido
+1. **app.py**: Pydantic valida el body (422 si está mal), se valida el token (401) y se compara el id del token con el user_id de la ruta (403).
+2. **utils.py** (create_player):
+    * El usuario existe.
+    * Los puntos PACSS suman exactamente 300 y cada atributo está en [20, 100].
+3. **product_repository.py** (create_player): inserta el jugador en la base de datos con owner_id, behavior_id default (0) e is_starter false.
+4. **utils.py** (build_player_out) convierte el objeto ORM plano a PlayerOut con pacss_attributes anidado, y app.py responde 201.
+
+### Respuesta:
+| Código | Cuando | detail |
+| :--- | :--- | :--- |
+| **201** | Jugador creado | PlayerOut: player_id, name, shirt_number, behavior_id, pacss_attributes, team_id |
+| **400** | Puntos PACSS inválidos | Points must total 300, each between 20 and 100. |
+| **401** | Token inválido | Could not validate credentials. |
+| **403** | user_id distinto del usuario autenticado | Not allowed to players for another user. |
+| **404** | Usuario inexistente | User could not be found. |
+| **422** | Campo faltante o estructura inválida | Lista de Pydantic. |
+
+### Reglas
+
+**Nombre**: requerido, sin límite de largo (se valida en schemas si lo deseas).
+**Número de camiseta**: 0-99, requerido.
+**PACSS**: cada atributo entre 20 y 100 inclusive, suma total = 300. Los 5 atributos son obligatorios.
+**Propietario**: el jugador pertenece al usuario que hace la request; solo ese usuario puede usarlo en equipos.
+**Comportamiento**: todo jugador nuevo recibe behavior_id = 0 (default); puede cambiar cuando se asigna a un equipo.
+**Equipo**: inicialmente null; se asigna cuando se crea un equipo que incluya al jugador.
