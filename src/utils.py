@@ -257,3 +257,50 @@ def create_team(db: Session, user_id: int, team_in: schemas.TeamCreate):
  
     return build_team_out(team)
 
+#---------------------- Friendly Matches schemas -----------------------
+
+def check_friendly_match_duration(match_duration: int):
+    if not (1 <= match_duration <= 5):
+        raise schemas.InvalidDurationError("Match duration must be between 1 and 5 minutes.")
+
+def check_friendly_team(team) -> int:
+    if not team:
+        raise schemas.TeamNotFoundError()
+    
+    starters = [p for p in team.players if p.is_starter]
+    if len(starters) != 3:
+        raise schemas.TeamIncompleteError()
+    
+    return team.team_id
+
+def create_friendly_match(db: Session, user_id: int, match_in: schemas.FriendlyMatchCreate):
+    # 1. Validaciones puras
+    check_friendly_match_duration(match_in.match_duration)
+
+    # 2. Validación de usuario (inline)
+    if not repo.get_user(db, user_id):
+        raise schemas.UserNotFoundError()
+
+    # 3. Validación de equipo
+    team = repo.get_team_by_owner_and_name(db, owner_id=user_id, name=match_in.team_name)
+    check_friendly_team(team)
+
+    # 4. Creación con try/except
+    try:
+        match = repo.create_match(
+            db,
+            is_friendly=True,
+            status="open",
+            home_team_id=team.team_id,
+            away_team_id=None,
+            match_duration=match_in.match_duration,
+            is_private=False,
+            password=None,
+            current_period=0,
+            league_id=None,
+            scheduled_at=None,
+        )
+    except IntegrityError:
+        raise schemas.CreateMatchError()
+
+    return match
