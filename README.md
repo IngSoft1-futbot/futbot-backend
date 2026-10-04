@@ -146,15 +146,13 @@ Ejemplo: current_user_id: int = Depends(get_current_user_id)
     "control": 75,
     "speed": 70,
     "strength": 15
-  },
-  "team_id": null
+  }
 }
 ```
 
 * name: nombre del jugador (requerido).
 * shirt_number: número de camiseta 0-99 (requerido).
 * pacss_attributes: objeto con los 5 atributos. Cada uno entre 20 y 100, suma total exactamente 300 (requerido).
-* team_id: opcional, siempre null en creación (se asigna cuando se crea un equipo).
 
 ### Recorrido
 1. **app.py**: Pydantic valida el body (422 si está mal), se valida el token (401) y se compara el id del token con el user_id de la ruta (403).

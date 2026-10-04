@@ -1,6 +1,7 @@
 import os
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from .models import Base, Behavior
@@ -37,7 +38,11 @@ def seed_default_behavior(db) -> None:
             python_code="# default behavior",
             is_default=True,
         ))
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Otro proceso (otro worker de uvicorn) lo creo justo antes: no es un error.
+            db.rollback()
 
 
 def init_db():
