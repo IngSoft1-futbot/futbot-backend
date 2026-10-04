@@ -169,9 +169,22 @@ def test_authenticate_and_create_token_falla(repo_mock):
 
 #-------------------------------------Crear Equipo-----------------------------------------------
  
-def make_player(pid, owner_id=1, team_id=None, behavior_id=0, is_starter=None):
-    return SimpleNamespace(player_id=pid, owner_id=owner_id, team_id=team_id,
-                           name=f"Jugador {pid}", behavior_id=behavior_id, is_starter=is_starter)
+def make_player(pid, owner_id=1, team_id=None, shirt_number=10, behavior_id=0,
+                is_starter=None, power=60, agility=60, control=60, speed=60, strength=60):
+    return SimpleNamespace(
+        player_id=pid,
+        owner_id=owner_id,
+        team_id=team_id,
+        name=f"Jugador {pid}",
+        shirt_number=shirt_number,
+        behavior_id=behavior_id,
+        is_starter=is_starter,
+        power=power,
+        agility=agility,
+        control=control,
+        speed=speed,
+        strength=strength,
+    )
  
  
 def make_behavior(bid, creator_id=None, is_default=False):
@@ -511,3 +524,312 @@ def test_get_friendly_matches_no_esconde_errores_que_no_son_de_la_base(db, repo_
 
     with pytest.raises(AttributeError):
         utils.get_available_friendly_matches(db)
+ 
+ 
+# ---------- PlayerOut ----------
+ 
+def test_player_out_se_construye_desde_un_objeto_orm():
+    orm_player = SimpleNamespace(
+        player_id=7, name="Lionel Messi", shirt_number=10, behavior_id=0,
+        team_id=None, owner_id=1,                      # owner_id sobra: se ignora
+        power=90, agility=95, control=60, speed=30, strength=25,
+    )
+
+    out = utils.build_player_out(orm_player)
+
+    assert out.model_dump() == {
+        "player_id": 7,
+        "name": "Lionel Messi",
+        "shirt_number": 10,
+        "behavior_id": 0,
+        "team_id": None,
+        "pacss_attributes": {
+            "power": 90, "agility": 95, "control": 60, "speed": 30, "strength": 25,
+        },
+    }
+    
+# ============================== Crear Jugador
+
+def make_player_in(power=60, agility=60, control=60, speed=60, strength=60,
+                   shirt_number=10, name="Jugador 7"):
+    return schemas.PlayerIn(
+        name=name,
+        shirt_number=shirt_number,
+        pacss_attributes=schemas.PacssAttributes(
+            power=power, agility=agility, control=control,
+            speed=speed, strength=strength,
+        ),
+    )
+
+
+# ---------- validate_pacss / verify_player ----------
+
+def test_validate_pacss_ok():
+    assert utils.validate_pacss(make_player_in().pacss_attributes) is True
+
+
+@pytest.mark.parametrize(
+    "attrs",
+    [
+        dict(power=61),                           # suma 301
+        dict(power=59),                           # suma 299
+        dict(power=19, agility=61),               # suma 300 pero 19 < 20
+        dict(power=101, agility=19, control=20,
+             speed=80, strength=80),              # suma 300 pero 101 > 100
+    ],
+)
+def test_validate_pacss_invalido(attrs):
+    assert utils.validate_pacss(make_player_in(**attrs).pacss_attributes) is False
+
+
+def test_validate_pacss_limites_validos():
+    # 100 + 100 + 20 + 40 + 40 = 300, todos dentro de [20, 100]
+    p = make_player_in(power=100, agility=100, control=20, speed=40, strength=40)
+    assert utils.validate_pacss(p.pacss_attributes) is True
+
+
+def test_verify_player_cambio_de_pacss():
+    assert utils.verify_player(make_player_in()) is True
+    assert utils.verify_player(make_player_in(power=100)) is False
+
+
+# ---------- build_player_out ----------
+
+def test_build_player_out_desde_objeto_orm():
+    orm_player = SimpleNamespace(
+        player_id=7, name="Lionel Messi", shirt_number=10, behavior_id=0,
+        team_id=None, owner_id=1,                  # owner_id sobra: se ignora
+        power=90, agility=95, control=60, speed=30, strength=25,
+    )
+
+    out = utils.build_player_out(orm_player)
+
+    assert out.model_dump() == {
+        "player_id": 7,
+        "name": "Lionel Messi",
+        "shirt_number": 10,
+        "behavior_id": 0,
+        "team_id": None,
+        "pacss_attributes": {
+            "power": 90, "agility": 95, "control": 60, "speed": 30, "strength": 25,
+        },
+    }
+
+
+# ---------- create_player ----------
+
+def test_create_player_ok(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.create_player.return_value = make_player(7)
+
+    out = utils.create_player(db, 1, make_player_in())
+
+    assert isinstance(out, schemas.PlayerOut)
+    assert out.player_id == 7
+    assert out.shirt_number == 10
+    assert out.pacss_attributes.power == 60
+    repo_mock.create_player.assert_called_once()
+
+
+def test_create_player_pasa_los_datos_al_repository(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.create_player.return_value = make_player(7)
+    player_in = make_player_in()
+
+    utils.create_player(db, 1, player_in)
+
+    repo_mock.create_player.assert_called_once_with(db, 1, player_in)
+
+
+def test_create_player_usuario_inexistente(db, repo_mock):
+    repo_mock.get_user.return_value = None
+
+    with pytest.raises(schemas.UserNotFoundError):
+        utils.create_player(db, 1, make_player_in())
+
+    repo_mock.create_player.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "attrs",
+    [dict(power=100, agility=100, control=100, speed=100, strength=100),  # suma 500
+     dict(power=19, agility=61)],                                         # fuera de rango
+)
+def test_create_player_puntos_invalidos_no_toca_la_base(db, repo_mock, attrs):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+
+    with pytest.raises(schemas.PointAssignmentError):
+        utils.create_player(db, 1, make_player_in(**attrs))
+
+    repo_mock.create_player.assert_not_called()
+    
+# ============================== get_players
+
+def test_get_players_ok(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_players.return_value = [
+        make_player(7, is_starter=True),
+        make_player(8, is_starter=False),
+    ]
+
+    out = utils.get_players(db, 1)
+
+    assert isinstance(out, list)
+    assert len(out) == 2
+    assert all(isinstance(p, schemas.PlayerOut) for p in out)
+    assert [p.player_id for p in out] == [7, 8]
+    repo_mock.get_players.assert_called_once_with(db, 1)
+
+
+def test_get_players_lista_vacia(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_players.return_value = []
+
+    out = utils.get_players(db, 1)
+
+    assert out == []
+    repo_mock.get_players.assert_called_once()
+
+
+def test_get_players_usuario_inexistente(db, repo_mock):
+    repo_mock.get_user.return_value = None
+
+    with pytest.raises(schemas.UserNotFoundError):
+        utils.get_players(db, 999)
+
+    repo_mock.get_players.assert_not_called()
+
+
+def test_get_players_hace_una_consulta_a_la_base(db, repo_mock):
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_players.return_value = [make_player(7)]
+
+    utils.get_players(db, 1)
+
+    repo_mock.get_players.assert_called_once_with(db, 1)
+
+# ----------------- Friendly Matches -----------------
+ 
+def make_friendly_match_in(team_name="Mi Equipo", match_duration=3, user_id=1):
+    return schemas.FriendlyMatchCreate(
+        user_id= user_id,          
+        team_name=team_name,
+        match_duration=match_duration,
+    )
+
+# ----------------- check_friendly_match_duration -----------------
+
+@pytest.mark.parametrize("duration", [1, 2, 3, 4, 5])
+def test_check_friendly_match_duration_ok(duration):
+    utils.check_friendly_match_duration(duration)  # no lanza
+
+
+@pytest.mark.parametrize("duration", [-2 , 6, 0, -1, 10])
+def test_check_friendly_match_duration_invalida(duration):
+    with pytest.raises(schemas.InvalidDurationError):
+        utils.check_friendly_match_duration(duration)
+
+
+# --------------------- check_friendly_team ---------------------
+
+def test_check_friendly_team_ok():
+    team = SimpleNamespace(
+        team_id=1,
+        players=[
+            make_player(7, is_starter=True),
+            make_player(8, is_starter=True),
+            make_player(9, is_starter=True),
+            make_player(10, is_starter=False),
+        ]
+    )
+    assert utils.check_friendly_team(team) == 1
+
+
+def test_check_friendly_team_no_existe():
+    with pytest.raises(schemas.TeamNotFoundError):
+        utils.check_friendly_team(None)
+
+
+@pytest.mark.parametrize("starters_count", [0, 1, 2, 4])
+def test_check_friendly_team_titulares_incorrectos(starters_count):
+    team = SimpleNamespace(
+        team_id=1,
+        players=[make_player(i, is_starter=(i < starters_count + 7)) for i in range(7, 7 + starters_count)]
+    )
+    with pytest.raises(schemas.TeamIncompleteError):
+        utils.check_friendly_team(team)
+
+
+# --------------------- create_friendly_match ---------------------
+
+@pytest.fixture
+def repo_friendly(repo_mock):
+    """Repository configurado para el camino optimo de create_friendly_match."""
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_team_by_owner_and_name.return_value = SimpleNamespace(
+        team_id=1,
+        players=[
+            make_player(7, is_starter=True),
+            make_player(8, is_starter=True),
+            make_player(9, is_starter=True),
+        ]
+    )
+    repo_mock.create_match.return_value = SimpleNamespace(match_id=10, is_friendly=True)
+    return repo_mock
+
+
+def test_create_friendly_match_ok(db, repo_friendly):
+    result = utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+    assert result.match_id == 10
+    assert result.is_friendly is True
+    repo_friendly.create_match.assert_called_once()
+
+
+def test_create_friendly_match_duracion_invalida_falla_rapido(db, repo_friendly):
+    with pytest.raises(schemas.InvalidDurationError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in(match_duration=10))
+
+    repo_friendly.get_user.assert_not_called()
+    repo_friendly.create_match.assert_not_called()
+
+
+def test_create_friendly_match_usuario_inexistente(db, repo_friendly):
+    repo_friendly.get_user.return_value = None
+
+    with pytest.raises(schemas.UserNotFoundError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+    repo_friendly.create_match.assert_not_called()
+
+
+def test_create_friendly_match_equipo_inexistente(db, repo_friendly):
+    repo_friendly.get_team_by_owner_and_name.return_value = None
+
+    with pytest.raises(schemas.TeamNotFoundError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+    repo_friendly.create_match.assert_not_called()
+
+
+def test_create_friendly_match_equipo_incompleto(db, repo_friendly):
+    # Solo 2 titulares en lugar de 3
+    repo_friendly.get_team_by_owner_and_name.return_value = SimpleNamespace(
+        team_id=1,
+        players=[
+            make_player(7, is_starter=True),
+            make_player(8, is_starter=True),
+        ]
+    )
+
+    with pytest.raises(schemas.TeamIncompleteError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in())
+
+    repo_friendly.create_match.assert_not_called()
+
+
+def test_create_friendly_match_integrity_error_se_traduce(db, repo_friendly):
+    repo_friendly.create_match.side_effect = IntegrityError("INSERT", {}, Exception("error"))
+
+    with pytest.raises(schemas.CreateMatchError):
+        utils.create_friendly_match(db, 1, make_friendly_match_in())

@@ -37,18 +37,55 @@ TEAM_BODY = {
     ],
 }
  
+PACSS = {"power": 60, "agility": 60, "control": 60, "speed": 60, "strength": 60}
+
+PLAYER_BODY = {
+    "name": "Lionel Messi",
+    "shirt_number": 10,
+    "pacss_attributes": PACSS,
+    "team_id": None,
+}
+
+FAKE_PLAYER = {
+    "player_id": 7,
+    "name": "Lionel Messi",
+    "shirt_number": 10,
+    "behavior_id": 0,
+    "pacss_attributes": PACSS,
+    "team_id": None,
+}
+
+FAKE_PLAYERS = [
+    {
+        "player_id": 7,
+        "name": "Lionel Messi",
+        "shirt_number": 10,
+        "behavior_id": 0,
+        "pacss_attributes": PACSS,
+        "team_id": None,
+    },
+    {
+        "player_id": 8,
+        "name": "Cristiano Ronaldo",
+        "shirt_number": 9,
+        "behavior_id": 0,
+        "pacss_attributes": PACSS,
+        "team_id": None,
+    },
+]
+
 FAKE_TEAM = {
     "team_id": 1,
     "name": "Mi Equipo",
     "jugadores_titulares": [
-        {"player_id": 7, "name": "Lionel Messi", "behavior_id": 0},
-        {"player_id": 8, "name": "Cristiano Ronaldo", "behavior_id": 0},
-        {"player_id": 9, "name": "Erling Haaland", "behavior_id": 0},
+        {"player_id": 7, "name": "Lionel Messi", "shirt_number": 10, "behavior_id": 0, "pacss_attributes": PACSS},
+        {"player_id": 8, "name": "Cristiano Ronaldo", "shirt_number": 9, "behavior_id": 0, "pacss_attributes": PACSS},
+        {"player_id": 9, "name": "Erling Haaland", "shirt_number": 8, "behavior_id": 0, "pacss_attributes": PACSS},
     ],
     "jugadores_suplentes": [
-        {"player_id": 10, "name": "Kevin De Bruyne", "behavior_id": 0},
-        {"player_id": 11, "name": "Virgil van Dijk", "behavior_id": 0},
-        {"player_id": 12, "name": "Emiliano Martinez", "behavior_id": 0},
+        {"player_id": 10, "name": "Kevin De Bruyne", "shirt_number": 7, "behavior_id": 0, "pacss_attributes": PACSS},
+        {"player_id": 11, "name": "Virgil van Dijk", "shirt_number": 6, "behavior_id": 0, "pacss_attributes": PACSS},
+        {"player_id": 12, "name": "Emiliano Martinez", "shirt_number": 5, "behavior_id": 0, "pacss_attributes": PACSS},
     ],
 }
 
@@ -147,7 +184,7 @@ def test_login_endpoint_exitoso(client, utils_mock):
     # Simulamos que la utilidad valida y devuelve el token de acceso
     utils_mock.authenticate_and_create_token.return_value = "abc123token"
 
-    response = client.post("/auth/login/", json={
+    response = client.post("/auth/login", json={
         "email": "joaco3@gmail.com",
         "password": "Pass1234!"
     })
@@ -164,7 +201,7 @@ def test_login_endpoint_credenciales_invalidas(client, utils_mock):
     # Simulamos que la autenticación falla y devuelve None
     utils_mock.authenticate_and_create_token.return_value = None
 
-    response = client.post("/auth/login/", json={
+    response = client.post("/auth/login", json={
         "email": "joaco3@gmail.com",
         "password": "PasswordMala1!"
     })
@@ -178,13 +215,72 @@ def test_login_endpoint_credenciales_invalidas(client, utils_mock):
 
 def test_login_endpoint_email_invalido_por_pydantic(client, utils_mock):
     # Aca no hace falta mockear nada porque Pydantic frena la peticion antes
-    response = client.post("/auth/login/", json={
+    response = client.post("/auth/login", json={
         "email": "correoInvalidoSinArroba",
         "password": "Pass1234!"
     })
     
     assert response.status_code == 422
     utils_mock.authenticate_and_create_token.assert_not_called()
+    
+    
+#------------------------------------------Crear Jugador------------------------------------------
+
+
+def test_create_player_ok(client, utils_mock):
+    utils_mock.create_player.return_value = FAKE_PLAYER
+
+    r = client.post("/users/1/players", json=PLAYER_BODY)
+
+    assert r.status_code == 201
+    body = r.json()
+    assert body["player_id"] == 7
+    assert body["shirt_number"] == 10
+    assert body["pacss_attributes"]["power"] == 60
+    utils_mock.create_player.assert_called_once()
+
+
+def test_create_player_pasa_user_id_y_schema_a_utils(client, utils_mock):
+    app.dependency_overrides[get_current_user_id] = lambda: 42
+    utils_mock.create_player.return_value = FAKE_PLAYER
+
+    client.post("/users/42/players", json=PLAYER_BODY)
+
+    _, user_id, player_in = utils_mock.create_player.call_args.args
+    assert user_id == 42
+    assert isinstance(player_in, schemas.PlayerIn)
+    assert player_in.shirt_number == 10
+
+
+def test_create_player_sin_shirt_number_es_422(client, utils_mock):
+    body = {k: v for k, v in PLAYER_BODY.items() if k != "shirt_number"}
+
+    r = client.post("/users/1/players", json=body)
+
+    assert r.status_code == 422        # antes era un 500 por NotNullViolation
+    utils_mock.create_player.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "error, status_code, detail",
+    [
+        (schemas.UserNotFoundError, 404, "User could not be found."),
+        (schemas.PointAssignmentError, 400, "Points must total 300, each between 20 and 100."),
+    ],
+)
+def test_create_player_errores_de_negocio(client, utils_mock, error, status_code, detail):
+    utils_mock.create_player.side_effect = error
+
+    r = client.post("/users/1/players", json=PLAYER_BODY)
+
+    assert r.status_code == status_code
+    assert r.json()["detail"] == detail
+
+def test_create_player_token_de_otro_usuario(client, utils_mock):
+    r = client.post("/users/2/players", json=PLAYER_BODY)
+
+    assert r.status_code == 403
+    utils_mock.create_player.assert_not_called()
     
 #------------------------------------------Crear Equipo------------------------------------------
  
@@ -279,6 +375,142 @@ def test_create_team_token_de_otro_usuario(client, utils_mock):
     assert r.status_code == 403
     utils_mock.create_team.assert_not_called()
  
+#------------------------------------------Obtener Jugadores------------------------------------------
+
+
+def test_get_players_ok(client, utils_mock):
+    utils_mock.get_players.return_value = FAKE_PLAYERS
+
+    r = client.get("/users/1/players")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body, list)
+    assert len(body) == 2
+    assert body[0]["player_id"] == 7
+    assert body[1]["player_id"] == 8
+    assert all("pacss_attributes" in p for p in body)
+    utils_mock.get_players.assert_called_once()
+
+
+def test_get_players_lista_vacia(client, utils_mock):
+    utils_mock.get_players.return_value = []
+
+    r = client.get("/users/1/players")
+
+    assert r.status_code == 200
+    body = r.json()
+    assert body == []
+
+
+def test_get_players_pasa_user_id_a_utils(client, utils_mock):
+    app.dependency_overrides[get_current_user_id] = lambda: 42
+    utils_mock.get_players.return_value = []
+
+    client.get("/users/42/players")
+
+    _, user_id = utils_mock.get_players.call_args.args
+    assert user_id == 42
+
+
+def test_get_players_usuario_inexistente(client, utils_mock):
+    utils_mock.get_players.side_effect = schemas.UserNotFoundError
+
+    r = client.get("/users/1/players")
+
+    assert r.status_code == 404
+    assert r.json()["detail"] == "User could not be found."
+
+
+def test_get_players_token_de_otro_usuario(client, utils_mock):
+    r = client.get("/users/2/players")
+
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Not allowed to view players of another user."
+    utils_mock.get_players.assert_not_called()
+
+
+def test_get_players_sin_token(client, utils_mock):
+    app.dependency_overrides.pop(get_current_user_id)
+
+    r = client.get("/users/1/players")
+
+    assert r.status_code in (401, 403)
+    utils_mock.get_players.assert_not_called()
+
+#------------------------------------------Crear Partido Amistoso------------------------------------------
+
+FAKE_FRIENDLY_MATCH = {
+    "id_match": 10,
+    "is_friendly": True,
+    "status": "open",
+    "home_team_id": 1,
+    "away_team_id": None,
+    "match_duration": 3,
+    "is_private": False,
+    "password": None,
+    "current_period": 0,
+    "league_id": None,
+    "scheduled_at": None,
+}
+
+FRIENDLY_MATCH_BODY = {
+    "team_name": "Mi Equipo",
+    "match_duration": 3,
+}
+
+
+def test_create_friendly_match_ok(client, utils_mock):
+    utils_mock.create_friendly_match.return_value = FAKE_FRIENDLY_MATCH
+
+    r = client.post("/users/1/friendly-matches", json=FRIENDLY_MATCH_BODY)
+
+    assert r.status_code == 201
+    body = r.json()
+    assert body["id_match"] == 10
+    assert body["is_friendly"] is True
+    assert body["home_team_id"] == 1
+    utils_mock.create_friendly_match.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "error, status_code, detail",
+    [
+        (schemas.UserNotFoundError, 404, "User not found."),
+        (schemas.TeamNotFoundError, 404, "Team not found or does not belong to the user."),
+        (schemas.InvalidDurationError("Match duration must be between 1 and 5 minutes."), 400, "Match duration must be between 1 and 5 minutes."),
+        (schemas.TeamIncompleteError, 400, "Team incomplete, must have exactly 3 starters."),
+        (schemas.CreateMatchError, 409, "Conflict in match creation."),
+    ],
+)
+def test_create_friendly_match_errores_de_negocio(client, utils_mock, error, status_code, detail):
+    utils_mock.create_friendly_match.side_effect = error
+
+    r = client.post("/users/1/friendly-matches", json=FRIENDLY_MATCH_BODY)
+
+    assert r.status_code == status_code
+    assert r.json()["detail"] == detail
+
+
+@pytest.mark.parametrize("campo", ["team_name", "match_duration"])
+def test_create_friendly_match_falta_campo_obligatorio(client, utils_mock, campo):
+    body = {k: v for k, v in FRIENDLY_MATCH_BODY.items() if k != campo}
+
+    r = client.post("/users/1/friendly-matches", json=body)
+
+    assert r.status_code == 422
+    utils_mock.create_friendly_match.assert_not_called()
+
+
+def test_create_friendly_match_token_de_otro_usuario(client, utils_mock):
+    # Como ya no hay user_id en el body, pasamos directamente FRIENDLY_MATCH_BODY limpio
+    r = client.post("/users/2/friendly-matches", json=FRIENDLY_MATCH_BODY)
+
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Not allowed to create matches for another user."
+    utils_mock.create_friendly_match.assert_not_called()
+
+
 # --------------   TESTS DE AMISTOSOS   --------------
 
 FAKE_FRIENDLIES = [

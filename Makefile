@@ -28,8 +28,10 @@ install: ## Crea el venv (si no existe) e instala dependencias
 	test -d $(VENV) || python3 -m venv $(VENV)
 	$(PIP) install fastapi uvicorn sqlalchemy psycopg2-binary email-validator bcrypt pytest httpx2 PyJWT 
 
-env: ## Crea .env con una SECRET_KEY nueva (si no existe)
-	@test -f .env || { printf "SECRET_KEY=%s\nALGORITHM=HS256\n" "$$(openssl rand -hex 32)" > .env && echo ".env creado"; }
+.env:
+	@printf "SECRET_KEY=%s\nALGORITHM=HS256\n" "$$(openssl rand -hex 32)" > .env && echo ".env creado"
+
+env: .env ## Crea .env con una SECRET_KEY nueva (si no existe)
 
 db: ## Levanta el contenedor de Postgres (lo crea si no existe)
 	@docker start $(DB_CONTAINER) >/dev/null 2>&1 || \
@@ -58,7 +60,7 @@ stop-db: ## Apaga el contenedor de Postgres (conserva los datos)
 	docker stop $(DB_CONTAINER)
 
 reset-db: db wait-db ## BORRA todas las tablas y las recrea con el esquema actual
-	$(PY) -c "from src.database import Base, engine; Base.metadata.drop_all(bind=engine); Base.metadata.create_all(bind=engine)"
+	$(PY) -c "from src.database import Base, engine, init_db; Base.metadata.drop_all(bind=engine); init_db()"
 	@echo "Tablas recreadas."
 
 psql: ## Abre una consola SQL dentro de la base

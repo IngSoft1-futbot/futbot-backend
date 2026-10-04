@@ -122,6 +122,116 @@ Ejemplo: current_user_id: int = Depends(get_current_user_id)
 **Plantel**: 3 titulares y 3 suplentes, sin repetidos. Un jugador solo puede estar en un equipo. 
 **Behavior**: opcional; sin behavior se usa el default (id 0).
 
+## Crear jugador
+
+`POST /users/{user_id}/players` Crea un jugador con atributos PACSS (Power, Agility, Control, Speed, Strength) que suman exactamente 300 puntos, cada uno entre 20 y 100. El jugador se asigna al usuario autenticado y recibe un behavior_id por defecto (0). Requiere token Bearer y el `user_id` de la ruta tiene que ser el del usuario autenticado.
+
+### Payload
+```json
+{
+  "name": "Lionel Messi",
+  "shirt_number": 10,
+  "pacss_attributes": {
+    "power": 60,
+    "agility": 80,
+    "control": 75,
+    "speed": 70,
+    "strength": 15
+  }
+}
+```
+
+* name: nombre del jugador (requerido).
+* shirt_number: número de camiseta 0-99 (requerido).
+* pacss_attributes: objeto con los 5 atributos. Cada uno entre 20 y 100, suma total exactamente 300 (requerido).
+
+### Recorrido
+1. **app.py**: Pydantic valida el body (422 si está mal), se valida el token (401) y se compara el id del token con el user_id de la ruta (403).
+2. **utils.py** (create_player):
+    * El usuario existe.
+    * Los puntos PACSS suman exactamente 300 y cada atributo está en [20, 100].
+3. **product_repository.py** (create_player): inserta el jugador en la base de datos con owner_id, behavior_id default (0) e is_starter false.
+4. **utils.py** (build_player_out) convierte el objeto ORM plano a PlayerOut con pacss_attributes anidado, y app.py responde 201.
+
+### Respuesta:
+| Código | Cuando | detail |
+| :--- | :--- | :--- |
+| **201** | Jugador creado | PlayerOut: player_id, name, shirt_number, behavior_id, pacss_attributes, team_id |
+| **400** | Puntos PACSS inválidos | Points must total 300, each between 20 and 100. |
+| **401** | Token inválido | Could not validate credentials. |
+| **403** | user_id distinto del usuario autenticado | Not allowed to players for another user. |
+| **404** | Usuario inexistente | User could not be found. |
+| **422** | Campo faltante o estructura inválida | Lista de Pydantic. |
+
+### Reglas
+
+**Nombre**: requerido, sin límite de largo (se valida en schemas si lo deseas).
+**Número de camiseta**: 0-99, requerido.
+**PACSS**: cada atributo entre 20 y 100 inclusive, suma total = 300. Los 5 atributos son obligatorios.
+**Propietario**: el jugador pertenece al usuario que hace la request; solo ese usuario puede usarlo en equipos.
+**Comportamiento**: todo jugador nuevo recibe behavior_id = 0 (default); puede cambiar cuando se asigna a un equipo.
+**Equipo**: inicialmente null; se asigna cuando se crea un equipo que incluya al jugador.
+
+
+## Crear partido amistoso
+
+`POST /users/{user_id}/friendly-matches` Crea un partido amistoso y lo deja en estado "open" (esperando rival) utilizando un equipo especifico del creador como equipo local (`home_team`). Requiere token Bearer. Para evitar manipulaciones, el `user_id` autenticado en el token, el de la ruta URL y el provisto en el JSON deben coincidir exactamente.
+
+### Payload
+```json
+{
+  "user_id": 1,
+  "team_name": "Mi Equipo",
+  "match_duration": 3
+}
+```
+.user_id: ID del usuario creador (debe coincidir con la URL).
+.team_name: Nombre exacto del equipo local (debe pertenecer al usuario).
+.match_duration: Duración de cada cuarto del partido en minutos (estrictamente entre 1 y 5).
+
+### Recorrido
+
+1.**app.py**: Pydantic valida la estructura de los datos (422 si falta un campo o tipo). Verifica   que el token sea válido (401). Confirma que el creador autenticado coincida con la ruta URL (403) y con el user_id enviado en el cuerpo de la petición (400).
+
+2.utils.py (create_friendly_match):
+
+  -Verifica que el usuario exista en la base de datos.
+
+  -Busca el equipo usando el team_name y asegurando que pertenezca al user_id.
+
+  -Valida la regla de negocio de la duración por cuarto (1 a 5 minutos).
+
+  -Chequea la integridad del equipo local, exigiendo que tenga exactamente 3 jugadores titulares.
+
+3.product_repository.py (create_match): Inserta el registro en la tabla matches forzando los valores automáticos para un amistoso público (is_friendly=True, status="open", away_team_id=None, is_private=False, password=None). Si hay un error de base de datos, hace rollback.
+
+4.app.py: Retorna un código HTTP 201 devolviendo los detalles completos del partido creado.
+
+### Respuesta:
+
+Código	  Cuando	  detail
+201	  Partido creado	  FriendlyMatchOut: id_match, is_friendly, status, home_team_id, away_team_id, match_duration, etc.
+400	  Mismatch de User ID	  User ID in body does not match User ID in path.
+400	  Duración fuera de rango	  Match duration must be between 1 and 5 minutes.
+400	  Equipo sin 3 titulares	  Team incomplete, must have exactly 3 starters.
+401	  Token inválido / ausente	  Could not validate credentials.
+403	  Crear a nombre de otro	  Not allowed to create matches for another user.
+404	  Usuario no existe	User not found.
+404	  Equipo ajeno o no existe	  Team not found or does not belong to the user.
+409	  Duplicado / Conflicto DB	  Conflict in match creation.
+422	  Estructura inválida	  Lista de Pydantic.
+
+
+### Reglas
+
+-Duracion: Estrictamente limitada a valores entre 1 y 5 minutos por cuarto (enviado a traves del campo match_duration).
+
+-Estado inicial: Todo amistoso nace con estado open y con el equipo visitante (away_team_id) vacio, esperando que otro jugador se una a la sala.
+
+-Validacion de Plantel: No basta con que el equipo exista, se verifica activamente en el momento de creacion del partido que el equipo cuente de manera integra con sus 3 jugadores titulares listos para jugar.
+
+-Detalle: esta implementacion tiene en consideracion solo que los amistosos sean publicos, en proximas actualizaciones se podra incluir distincion entre amistosos publicos y privados
+
 ## Listar partidos amistosos
 `GET /friendlymatches` Devuelve los partidos amistosos disponibles, es decir, los que estan abiertos esperando a otro jugador. Es una ruta publica: no requiere token ni recibe parametros.
 

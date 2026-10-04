@@ -183,17 +183,70 @@ def test_schema_no_valida_la_composicion_del_equipo():
     assert team.jugadores_suplentes == []
  
  
-# ---------- PlayerOut ----------
- 
+# ---------- PlayerIn ----------
+
+PLAYER_IN = {
+    "name": "Jugador",
+    "shirt_number": 10,
+    "pacss_attributes": {"power": 60, "agility": 60, "control": 60,
+                         "speed": 60, "strength": 60},
+}
+
+
+def test_player_in_valido():
+    p = schemas.PlayerIn(**PLAYER_IN)
+
+    assert p.shirt_number == 10
+
+
+@pytest.mark.parametrize("campo", ["name", "shirt_number", "pacss_attributes"])
+def test_player_in_falta_campo_obligatorio(campo):
+    data = {k: v for k, v in PLAYER_IN.items() if k != campo}
+
+    with pytest.raises(ValidationError):
+        schemas.PlayerIn(**data)
+
+
+def test_player_in_atributo_faltante():
+    data = {**PLAYER_IN, "pacss_attributes": {"power": 60, "agility": 60}}
+
+    with pytest.raises(ValidationError):
+        schemas.PlayerIn(**data)
+
+
 def test_player_out_se_construye_desde_un_objeto_orm():
     orm_player = SimpleNamespace(
-        player_id=7, name="Lionel Messi", behavior_id=0,
-        owner_id=1, power=90, agility=95,   # atributos de mas: se ignoran
+        player_id=7,
+        name="Lionel Messi",
+        shirt_number=10,
+        behavior_id=0,
+        team_id=None,
+        owner_id=1,  # campo extra: se ignora
+        pacss_attributes={
+            "power": 90,
+            "agility": 95,
+            "control": 60,
+            "speed": 30,
+            "strength": 25,
+        },
     )
- 
+
     out = schemas.PlayerOut.model_validate(orm_player)
- 
-    assert out.model_dump() == {"player_id": 7, "name": "Lionel Messi", "behavior_id": 0}
+
+    assert out.model_dump() == {
+        "player_id": 7,
+        "name": "Lionel Messi",
+        "shirt_number": 10,
+        "behavior_id": 0,
+        "pacss_attributes": {
+            "power": 90,
+            "agility": 95,
+            "control": 60,
+            "speed": 30,
+            "strength": 25,
+        },
+        "team_id": None,
+    }
  
 
 # --------------   TESTS DE AMISTOSOS   --------------
@@ -204,7 +257,7 @@ def test_friendly_match_out_se_construye_desde_un_objeto_orm():
         away_team_id=None, status="open", password="secreta",   # atributos de mas: se ignoran
     )
 
-    out = schemas.FriendlyMatchOut.model_validate(orm_match)
+    out = schemas.GETFriendlyMatchOut.model_validate(orm_match)
 
     assert out.model_dump() == {
         "id_match": 1, "home_team_id": 3, "match_duration": 10, "is_private": True,
@@ -215,4 +268,47 @@ def test_friendly_match_out_exige_la_duracion():
     orm_match = SimpleNamespace(id_match=1, home_team_id=3, match_duration=None, is_private=False)
 
     with pytest.raises(ValidationError):
-        schemas.FriendlyMatchOut.model_validate(orm_match)
+        schemas.GETFriendlyMatchOut.model_validate(orm_match)
+
+
+def test_player_out_acepta_pacss_ya_anidado():
+    out = schemas.PlayerOut(
+        player_id=7, name="X", shirt_number=10,
+        pacss_attributes=schemas.PacssAttributes(
+            power=60, agility=60, control=60, speed=60, strength=60),
+    )
+
+    assert out.behavior_id == 0      # default
+    assert out.team_id is None
+
+# --------------   TESTS DE PARTIDOS AMISTOSOS   --------------
+ 
+FRIENDLY_MATCH = {
+    "team_name": "Mi Equipo",
+    "match_duration": 3,
+}
+ 
+ 
+def test_friendly_match_create_valido():
+    match_in = schemas.FriendlyMatchCreate(**FRIENDLY_MATCH)
+ 
+    assert match_in.team_name == "Mi Equipo"
+    assert match_in.match_duration == 3
+ 
+ 
+@pytest.mark.parametrize("campo", ["team_name", "match_duration"])
+def test_friendly_match_create_falta_campo_obligatorio(campo):
+    data = {k: v for k, v in FRIENDLY_MATCH.items() if k != campo}
+ 
+    with pytest.raises(ValidationError):
+        schemas.FriendlyMatchCreate(**data)
+ 
+ 
+@pytest.mark.parametrize("campo, valor_invalido", [
+    ("match_duration", "tres"),
+])
+def test_friendly_match_create_tipos_invalidos(campo, valor_invalido):
+    data = {**FRIENDLY_MATCH, campo: valor_invalido}
+ 
+    with pytest.raises(ValidationError):
+        schemas.FriendlyMatchCreate(**data)

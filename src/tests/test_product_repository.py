@@ -1,11 +1,11 @@
+from unittest.mock import patch
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from src import models, product_repository as repo
-
+from src import models, schemas, product_repository as repo
 
 @pytest.fixture()
 def db():
@@ -270,6 +270,178 @@ def test_add_team_mismo_nombre_para_usuarios_distintos(db, usuario_con_jugadores
     repo.add_team(db, owner_id=otro.id, name="Mi Equipo", starters=[], substitutes=[])
  
     assert db.query(models.Team).count() == 2
+
+@pytest.fixture
+def db():
+    """BD en memoria para tests de repository."""
+    engine = create_engine("sqlite:///:memory:")
+    models.Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    return Session()
+
+
+def test_get_players_devuelve_jugadores_del_usuario(db):
+    # Crear dos usuarios
+    user1 = models.User(
+        club="club1", name="User1", email="user1@test.com", password_hash="hash"
+    )
+    user2 = models.User(
+        club="club2", name="User2", email="user2@test.com", password_hash="hash"
+    )
+    db.add_all([user1, user2])
+    db.commit()
+
+    # Crear jugadores para user1 y user2
+    p1 = models.Player(
+        name="Jugador 1", owner_id=user1.id, shirt_number=10,
+        power=60, agility=60, control=60, speed=60, strength=60,
+    )
+    p2 = models.Player(
+        name="Jugador 2", owner_id=user1.id, shirt_number=11,
+        power=60, agility=60, control=60, speed=60, strength=60,
+    )
+    p3 = models.Player(
+        name="Jugador 3", owner_id=user2.id, shirt_number=12,
+        power=60, agility=60, control=60, speed=60, strength=60,
+    )
+    db.add_all([p1, p2, p3])
+    db.commit()
+
+    # get_players debe devolver solo los de user1
+    result = repo.get_players(db, user1.id)
+
+    assert len(result) == 2
+    assert all(p.owner_id == user1.id for p in result)
+    assert {p.name for p in result} == {"Jugador 1", "Jugador 2"}
+
+
+def test_get_players_usuario_sin_jugadores(db):
+    user = models.User(
+        club="vacio", name="User", email="empty@test.com", password_hash="hash"
+    )
+    db.add(user)
+    db.commit()
+
+    result = repo.get_players(db, user.id)
+
+    assert result == []
+
+
+def test_get_players_usuario_inexistente(db):
+    result = repo.get_players(db, 999)
+
+    assert result == []
+    
+    
+def make_user(db, club="juan", email="juan@gmail.com"):
+    """Crea un usuario de prueba."""
+    user = models.User(
+        club=club, 
+        name="Juan",
+        email=email, 
+        password_hash="hash", 
+        avatar=None,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+ 
+# ============================== create_player
+
+def make_player_in(name="Lionel Messi", shirt_number=10, **pacss):
+    attrs = dict(power=60, agility=60, control=60, speed=60, strength=60) | pacss
+    return schemas.PlayerIn(
+        name=name,
+        shirt_number=shirt_number,
+        pacss_attributes=schemas.PacssAttributes(**attrs),
+    )
+
+def test_create_player_ok(db):
+    user = make_user(db)
+
+    p = repo.create_player(
+        db, user.id,
+        make_player_in(power=90, agility=50, control=50, speed=60, strength=50),
+    )
+
+    assert p.player_id is not None
+    assert p.name == "Lionel Messi"
+    assert p.shirt_number == 10
+    assert p.owner_id == user.id
+    # el pacss anidado se guarda en columnas planas
+    assert (p.power, p.agility, p.control, p.speed, p.strength) == (90, 50, 50, 60, 50)
+    assert p.behavior_id == 0      # default
+    assert p.team_id is None
+    assert p.is_starter is False
+
+
+def test_create_player_persiste_en_la_base(db):
+    user = make_user(db)
+
+    p = repo.create_player(db, user.id, make_player_in(name="Cristiano Ronaldo", shirt_number=7))
+
+    retrieved = db.query(models.Player).filter_by(player_id=p.player_id).first()
+    assert retrieved is not None
+    assert retrieved.name == "Cristiano Ronaldo"
+    assert retrieved.shirt_number == 7
+
+
+def test_create_player_multiples_para_mismo_usuario(db):
+    user = make_user(db)
+
+    for i in range(3):
+        repo.create_player(db, user.id, make_player_in(name=f"Jugador {i}", shirt_number=i + 1))
+
+    players = db.query(models.Player).filter_by(owner_id=user.id).all()
+    assert len(players) == 3
+
+
+def test_create_player_shirt_number_limites(db):
+    user = make_user(db)
+
+    p1 = repo.create_player(db, user.id, make_player_in(name="Uno", shirt_number=1))
+    p99 = repo.create_player(db, user.id, make_player_in(name="Noventa y nueve", shirt_number=99))
+
+    assert p1.shirt_number == 1
+    assert p99.shirt_number == 99
+
+# --------------   TESTS DE PARTIDOS AMISTOSOS   --------------
+
+def make_match(db, home_team_id, is_friendly=True, match_duration=3, status="open"):
+    return repo.create_match(
+        db,
+        is_friendly=is_friendly,
+        status=status,
+        home_team_id=home_team_id,
+        away_team_id=None,
+        match_duration=match_duration,
+        is_private=False,
+        password=None,
+        current_period=0,
+        league_id=None,
+        scheduled_at=None,
+    )
+
+
+def test_create_match_friendly_lo_guarda(db, usuario_con_jugadores):
+    # 1. Creamos un equipo valido en la base para poder asociarlo al partido
+    team = repo.add_team(
+        db, owner_id=usuario_con_jugadores.id, name="Mi Equipo",
+        starters=[(7, 0), (8, 0), (9, 0)],
+        substitutes=[(10, 0), (11, 0), (12, 0)],
+    )
+
+    # 2. Creamos el partido amistoso usando el repositorio
+    match = make_match(db, home_team_id=team.team_id, match_duration=3)
+
+    # 3. Verificaciones en la base de datos real de pruebas
+    assert match.id_match is not None
+    assert match.is_friendly is True
+    assert match.home_team_id == team.team_id
+    assert match.match_duration == 3
+    assert match.status == "open"
+    assert db.query(models.Match).count() == 1  
 
 # --------------   TESTS DE AMISTOSOS   --------------
 

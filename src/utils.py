@@ -3,12 +3,14 @@ import jwt
 import bcrypt
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
-
 from . import product_repository as repo
 from . import schemas
+
 DEFAULT_BEHAVIOR_ID = 0
 
 SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("Falta la variable de entorno SECRET_KEY. Definila antes de arrancar la app (make env la genera).")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 def password_validation(password: str):
@@ -32,7 +34,7 @@ def register_user(db: Session, user_in: schemas.UserCreate):
     # valida antes de tocar la base de datos
     password_validation(user_in.password)
 
-    email = user_in.email.lower()
+    email= user_in.email.lower()
     # 1. Chequeo previo (optimizacion: evita hashear si ya existe)
     if repo.get_user_by_email(db, email=email):
         raise schemas.EmailAlreadyExistsError()
@@ -53,6 +55,8 @@ def register_user(db: Session, user_in: schemas.UserCreate):
         )
     except IntegrityError:
         raise schemas.RegistrationError()
+
+
 
 #-----------------Login-----------------------
 def authenticate_user(db: Session, email: str, password: str):
@@ -102,18 +106,39 @@ def verify_jwt_token(token: str) -> int:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
         return user_id
-    except jwt.PyJWTError:
-        raise schemas.InvalidTokenError("User not authoriced.")
+    except (jwt.PyJWTError, TypeError, ValueError):
+        # PyJWTError: firma/formato invalido. TypeError: falta "sub". ValueError: "sub" no numerico.
+        raise schemas.InvalidTokenError("User not authorized.")
+
+#-----------------Crear Jugador-----------------------
+
+
+def validate_pacss(pacss)-> bool:
+    
+    attributes: list[int] = [pacss.power, pacss.agility, pacss.control, pacss.speed, pacss.strength]
+    if not all(20 <= attr <= 100 for attr in attributes):
+        return False
+
+    if sum(attributes) != 300:
+        return False
+
+    return True
+
+
+def verify_player(player: schemas.PlayerIn) -> bool:
+
+    pacss: schemas.PacssAttributes = player.pacss_attributes
+
+    return validate_pacss(pacss)
 
 
 
-#-----------------Crear Equipo-----------------------
 
 def check_composition_and_duplicated(team_in: schemas.TeamCreate):      # composicion y duplicados dentro de peticion
     num_titulares = len(team_in.jugadores_titulares)
     num_suplentes =len(team_in.jugadores_suplentes)
     
-    if not (num_titulares == 3 and num_suplentes == 3): # revisa 3 titulares y 3 jugadores en total
+    if not (num_titulares == 3 and num_suplentes == 3): # revisa 3 titulares y 3 suplentes
         raise schemas.TeamIncompleteError()
     
     ids = [p.player_id for p in team_in.jugadores_titulares + team_in.jugadores_suplentes]
@@ -159,8 +184,45 @@ def build_team_out(team) -> schemas.TeamOut:
     return schemas.TeamOut(
         team_id=team.team_id,
         name=team.name,
-        jugadores_titulares=[schemas.PlayerOut.model_validate(p) for p in players if p.is_starter],
-        jugadores_suplentes=[schemas.PlayerOut.model_validate(p) for p in players if not p.is_starter],
+        jugadores_titulares=[
+            build_player_out(p) for p in players if p.is_starter
+        ],
+        jugadores_suplentes=[
+            build_player_out(p) for p in players if not p.is_starter
+        ],
+    )
+
+
+def create_player(db: Session, user_id: int, player: schemas.PlayerIn):
+    if not repo.get_user(db, user_id):
+        raise schemas.UserNotFoundError()
+    if not verify_player(player):
+        raise schemas.PointAssignmentError()
+    return build_player_out(repo.create_player(db, user_id, player))
+
+
+def get_players(db: Session, user_id: int):
+    if not repo.get_user(db,user_id):
+        raise schemas.UserNotFoundError()
+    players = repo.get_players(db,user_id)
+    return [build_player_out(p) for p in players]
+
+
+def build_player_out(player) -> schemas.PlayerOut:
+    """Convierte un models.Player (columnas planas) en PlayerOut (pacss anidado)."""
+    return schemas.PlayerOut(
+        player_id=player.player_id,
+        name=player.name,
+        shirt_number=player.shirt_number,
+        behavior_id=player.behavior_id,
+        team_id=player.team_id,
+        pacss_attributes=schemas.PacssAttributes(
+            power=player.power,
+            agility=player.agility,
+            control=player.control,
+            speed=player.speed,
+            strength=player.strength,
+        ),
     )
  
  
@@ -195,6 +257,53 @@ def create_team(db: Session, user_id: int, team_in: schemas.TeamCreate):
  
     return build_team_out(team)
 
+#---------------------- Friendly Matches schemas -----------------------
+
+def check_friendly_match_duration(match_duration: int):
+    if not (1 <= match_duration <= 5):
+        raise schemas.InvalidDurationError("Match duration must be between 1 and 5 minutes.")
+
+def check_friendly_team(team) -> int:
+    if not team:
+        raise schemas.TeamNotFoundError()
+    
+    starters = [p for p in team.players if p.is_starter]
+    if len(starters) != 3:
+        raise schemas.TeamIncompleteError()
+    
+    return team.team_id
+
+def create_friendly_match(db: Session, user_id: int, match_in: schemas.FriendlyMatchCreate):
+    # 1. Validaciones puras
+    check_friendly_match_duration(match_in.match_duration)
+
+    # 2. Validación de usuario (inline)
+    if not repo.get_user(db, user_id):
+        raise schemas.UserNotFoundError()
+
+    # 3. Validación de equipo
+    team = repo.get_team_by_owner_and_name(db, owner_id=user_id, name=match_in.team_name)
+    check_friendly_team(team)
+
+    # 4. Creación con try/except
+    try:
+        match = repo.create_match(
+            db,
+            is_friendly=True,
+            status="open",
+            home_team_id=team.team_id,
+            away_team_id=None,
+            match_duration=match_in.match_duration,
+            is_private=False,
+            password=None,
+            current_period=0,
+            league_id=None,
+            scheduled_at=None,
+        )
+    except IntegrityError:
+        raise schemas.CreateMatchError()
+
+    return match
 def get_available_friendly_matches(db: Session):
     """Amistosos disponibles: los que esperan a otro jugador (status open)."""
     try:
