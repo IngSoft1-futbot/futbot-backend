@@ -437,3 +437,86 @@ def test_get_players_sin_token(client, utils_mock):
 
     assert r.status_code in (401, 403)
     utils_mock.get_players.assert_not_called()
+
+#------------------------------------------Crear Partido Amistoso------------------------------------------
+
+FAKE_FRIENDLY_MATCH = {
+    "id_match": 10,
+    "is_friendly": True,
+    "status": "open",
+    "home_team_id": 1,
+    "away_team_id": None,
+    "match_duration": 3,
+    "is_private": False,
+    "password": None,
+    "current_period": 0,
+    "league_id": None,
+    "scheduled_at": None,
+}
+
+FRIENDLY_MATCH_BODY = {
+    "user_id": 1,  
+    "team_name": "Mi Equipo",
+    "match_duration": 3,
+}
+
+
+def test_create_friendly_match_ok(client, utils_mock):
+    utils_mock.create_friendly_match.return_value = FAKE_FRIENDLY_MATCH
+
+    r = client.post("/users/1/friendly-matches", json=FRIENDLY_MATCH_BODY)
+
+    assert r.status_code == 201
+    body = r.json()
+    assert body["id_match"] == 10
+    assert body["is_friendly"] is True
+    assert body["home_team_id"] == 1
+    utils_mock.create_friendly_match.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "error, status_code, detail",
+    [
+        (schemas.UserNotFoundError, 404, "User not found."),
+        (schemas.TeamNotFoundError, 404, "Team not found or does not belong to the user."),
+        (schemas.InvalidDurationError("Match duration must be between 1 and 5 minutes."), 400, "Match duration must be between 1 and 5 minutes."),
+        (schemas.TeamIncompleteError, 400, "Team incomplete, must have exactly 3 starters."),
+        (schemas.CreateMatchError, 409, "Conflict in match creation."),
+    ],
+)
+def test_create_friendly_match_errores_de_negocio(client, utils_mock, error, status_code, detail):
+    utils_mock.create_friendly_match.side_effect = error
+
+    r = client.post("/users/1/friendly-matches", json=FRIENDLY_MATCH_BODY)
+
+    assert r.status_code == status_code
+    assert r.json()["detail"] == detail
+
+
+@pytest.mark.parametrize("campo", ["user_id", "team_name", "match_duration"])
+def test_create_friendly_match_falta_campo_obligatorio(client, utils_mock, campo):
+    body = {k: v for k, v in FRIENDLY_MATCH_BODY.items() if k != campo}
+
+    r = client.post("/users/1/friendly-matches", json=body)
+
+    assert r.status_code == 422
+    utils_mock.create_friendly_match.assert_not_called()
+
+
+def test_create_friendly_match_token_de_otro_usuario(client, utils_mock):
+    # El fixture del cliente inyecta por defecto el current_user_id = 1
+    # Intentamos crear el amistoso en la ruta del usuario 2 con su respectivo body
+    r = client.post("/users/2/friendly-matches", json={**FRIENDLY_MATCH_BODY, "user_id": 2})
+
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Not allowed to create matches for another user."
+    utils_mock.create_friendly_match.assert_not_called()
+
+
+def test_create_friendly_match_mismatch_body_y_path(client, utils_mock):
+    # Intentamos crearlo en la ruta del usuario 1, pero el body dice user_id = 2
+    r = client.post("/users/1/friendly-matches", json={**FRIENDLY_MATCH_BODY, "user_id": 2})
+
+    assert r.status_code == 400
+    assert r.json()["detail"] == "User ID in body does not match User ID in path."
+    utils_mock.create_friendly_match.assert_not_called()
