@@ -167,7 +167,7 @@ def check_behaviors(db: Session, user_id: int, behavior_ids: set[int]):
         behavior = behaviors.get(behavior_id)
         if behavior is None:
             raise schemas.BehaviorNotFoundError()
-        if not behavior.is_default and behavior.creator_id != user_id:
+        if behavior.creator_id is not None and behavior.creator_id != user_id:
             raise schemas.BehaviorNotAuthorizedError()
  
  
@@ -212,7 +212,7 @@ def get_behaviors(db: Session, user_id: int) -> list[schemas.BehaviorOut]:
     if not repo.get_user(db, user_id):
         raise schemas.UserNotFoundError()
 
-    behaviors = repo.get_behaviors_by_creator(db, creator_id=user_id)
+    behaviors = repo.get_predefined_behaviors(db)
     return [
         schemas.BehaviorOut(
             id_behavior=behavior.id_behavior,
