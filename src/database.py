@@ -28,25 +28,36 @@ def get_db():
     finally:
         db.close()
         
-def seed_default_behavior(db) -> None:
-    """Crea el behavior por defecto (id 0) si todavía no existe."""
-    if db.get(Behavior, 0) is None:
-        db.add(Behavior(
-            id_behavior=0,
-            creator_id=None,          # es del sistema, no de un usuario
-            name="Default",
-            python_code="# default behavior",
-            is_default=True,
-        ))
-        try:
-            db.commit()
-        except IntegrityError:
-            # Otro proceso (otro worker de uvicorn) lo creo justo antes: no es un error.
-            db.rollback()
+PREDEFINED_BEHAVIORS = (
+    (0, "Correr rapido a la pelota", True),
+    (1, "Posicion defensiva", False),
+    (2, "Stand-By", False),
+)
+
+
+def seed_predefined_behaviors(db) -> None:
+    """Crea o actualiza los tres behaviors del sistema con código vacío."""
+    for behavior_id, name, is_default in PREDEFINED_BEHAVIORS:
+        behavior = db.get(Behavior, behavior_id)
+        if behavior is None:
+            behavior = Behavior(id_behavior=behavior_id)
+            db.add(behavior)
+        behavior.creator_id = None
+        behavior.name = name
+        behavior.python_code = ""
+        behavior.is_default = is_default
+
+    try:
+        db.commit()
+    except IntegrityError:
+        # Otro proceso pudo insertar los mismos IDs al iniciar simultáneamente.
+        db.rollback()
+        if not all(db.get(Behavior, behavior_id) for behavior_id, _, _ in PREDEFINED_BEHAVIORS):
+            raise
 
 
 def init_db():
     """Crea las tablas que falten y siembra los datos base."""
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
-        seed_default_behavior(db)
+        seed_predefined_behaviors(db)
