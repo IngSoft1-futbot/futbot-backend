@@ -122,6 +122,25 @@ Ejemplo: current_user_id: int = Depends(get_current_user_id)
 **Plantel**: 3 titulares y 3 suplentes, sin repetidos. Un jugador solo puede estar en un equipo. 
 **Behavior**: opcional; sin behavior se usa el default (id 0).
 
+## Obtener behaviors
+
+`GET /users/{user_id}/behaviors` devuelve los behaviors creados por el usuario autenticado. No incluye el behavior default global. Requiere token y el `user_id` de la ruta debe coincidir con el usuario autenticado.
+
+La respuesta incluye `status`, `data` y `message`. Cada elemento de `data` contiene `behavior_id` y `name`; si el usuario no tiene behaviors, `data` es una lista vacía.
+
+```json
+{
+  "status": "200",
+  "data": [
+    {
+      "behavior_id": 5,
+      "name": "Defensa"
+    }
+  ],
+  "message": "Behaviors listed successfully."
+}
+```
+
 ## Crear jugador
 
 `POST /users/{user_id}/players` Crea un jugador con atributos PACSS (Power, Agility, Control, Speed, Strength) que suman exactamente 300 puntos, cada uno entre 20 y 100. El jugador se asigna al usuario autenticado y recibe un behavior_id por defecto (0). Requiere token Bearer y el `user_id` de la ruta tiene que ser el del usuario autenticado.
