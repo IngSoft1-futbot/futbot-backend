@@ -122,6 +122,33 @@ Ejemplo: current_user_id: int = Depends(get_current_user_id)
 **Plantel**: 3 titulares y 3 suplentes, sin repetidos. Un jugador solo puede estar en un equipo. 
 **Behavior**: opcional; sin behavior se usa el default (id 0).
 
+## Obtener behaviors
+
+`GET /users/{user_id}/behaviors` devuelve tres behaviors predefinidos sembrados en la base de datos al iniciar la aplicación. Se almacenan con `python_code` vacío y están disponibles para todos los usuarios. Requiere token y el `user_id` de la ruta debe coincidir con el usuario autenticado.
+
+La respuesta incluye `status`, `data` y `message`. Cada elemento de `data` contiene `behavior_id` y `name`; los behaviors predefinidos son `Correr rapido a la pelota` (ID 0), `Posicion defensiva` (ID 1) y `Stand-By` (ID 2).
+
+```json
+{
+  "status": "200",
+  "data": [
+    {
+      "behavior_id": 0,
+      "name": "Correr rapido a la pelota"
+    },
+    {
+      "behavior_id": 1,
+      "name": "Posicion defensiva"
+    },
+    {
+      "behavior_id": 2,
+      "name": "Stand-By"
+    }
+  ],
+  "message": "Behaviors listed successfully."
+}
+```
+
 ## Crear jugador
 
 `POST /users/{user_id}/players` Crea un jugador con atributos PACSS (Power, Agility, Control, Speed, Strength) que suman exactamente 300 puntos, cada uno entre 20 y 100. El jugador se asigna al usuario autenticado y recibe un behavior_id por defecto (0). Requiere token Bearer y el `user_id` de la ruta tiene que ser el del usuario autenticado.
