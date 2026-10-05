@@ -308,8 +308,16 @@ def test_check_behaviors_default_es_de_todos(db, repo_mock):
     repo_mock.get_behaviors_by_ids.return_value = [make_behavior(0, creator_id=None, is_default=True)]
  
     utils.check_behaviors(db, 999, {0})
- 
- 
+
+
+def test_check_behaviors_predefinido_no_default_es_de_todos(db, repo_mock):
+    repo_mock.get_behaviors_by_ids.return_value = [
+        make_behavior(1, creator_id=None, is_default=False)
+    ]
+
+    utils.check_behaviors(db, 999, {1})
+
+
 # ================================================ resolve_behavior_id
  
  
@@ -650,21 +658,52 @@ def test_create_player_usuario_inexistente(db, repo_mock):
     repo_mock.create_player.assert_not_called()
 
 
-def test_get_behaviors_devuelve_solo_datos_publicos_y_codigo_vacio(db, repo_mock):
-    behavior = SimpleNamespace(
-        id_behavior=5, name="Defensa", python_code="print('secret')", is_default=False
-    )
+def test_get_behaviors_devuelve_tres_behaviors_predefinidos_sin_codigo(db, repo_mock):
     repo_mock.get_user.return_value = SimpleNamespace(id=1)
-    repo_mock.get_behaviors_by_creator.return_value = [behavior]
+    repo_mock.get_predefined_behaviors.return_value = [
+        SimpleNamespace(
+            id_behavior=0,
+            name="Correr rapido a la pelota",
+            python_code="# old code",
+            is_default=True,
+        ),
+        SimpleNamespace(
+            id_behavior=1,
+            name="Posicion defensiva",
+            python_code="# old code",
+            is_default=False,
+        ),
+        SimpleNamespace(
+            id_behavior=2,
+            name="Stand-By",
+            python_code="# old code",
+            is_default=False,
+        ),
+    ]
 
     behaviors = utils.get_behaviors(db, 1)
 
     assert behaviors == [
         schemas.BehaviorOut(
-            id_behavior=5, name="Defensa", python_code="", is_default=False
-        )
+            id_behavior=0,
+            name="Correr rapido a la pelota",
+            python_code="",
+            is_default=True,
+        ),
+        schemas.BehaviorOut(
+            id_behavior=1,
+            name="Posicion defensiva",
+            python_code="",
+            is_default=False,
+        ),
+        schemas.BehaviorOut(
+            id_behavior=2,
+            name="Stand-By",
+            python_code="",
+            is_default=False,
+        ),
     ]
-    repo_mock.get_behaviors_by_creator.assert_called_once_with(db, creator_id=1)
+    repo_mock.get_predefined_behaviors.assert_called_once_with(db)
 
 
 def test_get_behaviors_usuario_inexistente(db, repo_mock):
@@ -673,7 +712,7 @@ def test_get_behaviors_usuario_inexistente(db, repo_mock):
     with pytest.raises(schemas.UserNotFoundError):
         utils.get_behaviors(db, 1)
 
-    repo_mock.get_behaviors_by_creator.assert_not_called()
+    repo_mock.get_predefined_behaviors.assert_not_called()
 
 
 @pytest.mark.parametrize(
