@@ -273,6 +273,13 @@ def create_team(db: Session, user_id: int, team_in: schemas.TeamCreate):
  
     return build_team_out(team)
 
+
+def get_teams(db: Session, user_id: int) -> list[schemas.TeamOut]:
+    if not repo.get_user(db, user_id):
+        raise schemas.UserNotFoundError()
+    teams = repo.get_teams_by_owner(db, owner_id=user_id)
+    return [build_team_out(team) for team in teams]
+
 #---------------------- Friendly Matches schemas -----------------------
 
 def check_friendly_match_duration(match_duration: int):
