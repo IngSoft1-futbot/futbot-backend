@@ -44,6 +44,15 @@ def get_user(db: Session, user_id: int) -> Optional[models.User]:
     return db.get(models.User, user_id)
 
 
+def get_behaviors_by_creator(db: Session, *, creator_id: int) -> list[models.Behavior]:
+    return (
+        db.query(models.Behavior)
+        .filter(models.Behavior.creator_id == creator_id)
+        .order_by(models.Behavior.id_behavior)
+        .all()
+    )
+
+
 def get_players_by_ids(db: Session, *, ids: list[int]) -> list[models.Player]:
     return (
         db.query(models.Player)
