@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, Boolean, UniqueConstraint, text
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship, declarative_base
 Base = declarative_base()
@@ -92,13 +92,14 @@ class Match(Base):
     home_team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=False)  # equipo local / creador
     away_team_id = Column(Integer, ForeignKey("teams.team_id"), nullable=True)  # visitante / oponente; null mientras el amistoso espera rival
     match_duration = Column(Integer, nullable=False)  # duracion del partido(min).
+    in_progress = Column(Boolean, nullable=True)
     is_private= Column(Boolean, default=False, nullable=False)
     password = Column(String(255), nullable=True)  # solo si es amistoso y el creador puso password
     # cambiamos Date por Int para almacena solo la "fecha" del partido a manera de secuencia
     scheduled_at = Column(Integer, nullable=True)  # null si es amistoso
-    status = Column(String(20), default="open", nullable=False)  # open / started / finished / cancelled
+    status = Column(String(20), default="open", server_default=text("'open'"), nullable=False)  # open / started / finished / cancelled
     current_period = Column(Integer, default=0, nullable=False)  # 0=no iniciado, 1-4 tiempos
-    is_friendly = Column(Boolean, default=False, nullable=False)  # true si es amistoso, false si es de liga
+    is_friendly = Column(Boolean, default=True, server_default=text("TRUE"), nullable=False)  # true si es amistoso, false si es de liga
 
     league = relationship("League", back_populates="matches")
     home_team = relationship("Team", foreign_keys=[home_team_id], back_populates="home_matches")
