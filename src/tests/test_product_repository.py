@@ -110,8 +110,23 @@ def test_get_user_existente(db):
  
 def test_get_user_inexistente(db):
     assert repo.get_user(db, 999) is None
- 
- 
+
+
+# ---------- get_behaviors_by_creator ----------
+
+def test_get_behaviors_by_creator_solo_devuelve_los_del_usuario_y_ordenados(db):
+    user = make_user(db)
+    otro = make_user(db, club="pedro", email="pedro@gmail.com")
+    make_behavior(db, 8, creator_id=user.id, is_default=False)
+    make_behavior(db, 3, creator_id=user.id, is_default=False)
+    make_behavior(db, 9, creator_id=otro.id, is_default=False)
+    make_behavior(db, 0)
+
+    behaviors = repo.get_behaviors_by_creator(db, creator_id=user.id)
+
+    assert [behavior.id_behavior for behavior in behaviors] == [3, 8]
+
+
 # ---------- get_players_by_ids ----------
  
 def test_get_players_by_ids_devuelve_solo_los_pedidos(db, usuario_con_jugadores):
