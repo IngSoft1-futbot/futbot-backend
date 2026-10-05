@@ -395,6 +395,12 @@ def create_friendly_match(
         )
 
 
+@app.post(
+    "/friendly-matches/{match_id}/join",
+    response_model=schemas.FriendlyMatchOut,
+    tags=["Friendly Matches"],
+    responses=responses.JOIN_FRIENDLY_MATCH_RESPONSES,
+)
 @app.put(
     "/friendly-matches/{match_id}/away-team",
     response_model=schemas.FriendlyMatchOut,
