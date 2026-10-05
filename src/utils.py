@@ -208,6 +208,22 @@ def get_players(db: Session, user_id: int):
     return [build_player_out(p) for p in players]
 
 
+def get_behaviors(db: Session, user_id: int) -> list[schemas.BehaviorOut]:
+    if not repo.get_user(db, user_id):
+        raise schemas.UserNotFoundError()
+
+    behaviors = repo.get_behaviors_by_creator(db, creator_id=user_id)
+    return [
+        schemas.BehaviorOut(
+            id_behavior=behavior.id_behavior,
+            name=behavior.name,
+            python_code="",
+            is_default=behavior.is_default,
+        )
+        for behavior in behaviors
+    ]
+
+
 def build_player_out(player) -> schemas.PlayerOut:
     """Convierte un models.Player (columnas planas) en PlayerOut (pacss anidado)."""
     return schemas.PlayerOut(
