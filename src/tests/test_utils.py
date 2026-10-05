@@ -650,6 +650,32 @@ def test_create_player_usuario_inexistente(db, repo_mock):
     repo_mock.create_player.assert_not_called()
 
 
+def test_get_behaviors_devuelve_solo_datos_publicos_y_codigo_vacio(db, repo_mock):
+    behavior = SimpleNamespace(
+        id_behavior=5, name="Defensa", python_code="print('secret')", is_default=False
+    )
+    repo_mock.get_user.return_value = SimpleNamespace(id=1)
+    repo_mock.get_behaviors_by_creator.return_value = [behavior]
+
+    behaviors = utils.get_behaviors(db, 1)
+
+    assert behaviors == [
+        schemas.BehaviorOut(
+            id_behavior=5, name="Defensa", python_code="", is_default=False
+        )
+    ]
+    repo_mock.get_behaviors_by_creator.assert_called_once_with(db, creator_id=1)
+
+
+def test_get_behaviors_usuario_inexistente(db, repo_mock):
+    repo_mock.get_user.return_value = None
+
+    with pytest.raises(schemas.UserNotFoundError):
+        utils.get_behaviors(db, 1)
+
+    repo_mock.get_behaviors_by_creator.assert_not_called()
+
+
 @pytest.mark.parametrize(
     "attrs",
     [dict(power=100, agility=100, control=100, speed=100, strength=100),  # suma 500
