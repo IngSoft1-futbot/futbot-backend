@@ -106,6 +106,14 @@ class TeamOut(BaseModel):
     jugadores_suplentes: list[PlayerOut]
 
 
+class TeamSummaryOut(BaseModel):
+    team_id: int
+    name: str
+class TeamsListResponse(BaseModel):
+    status: Literal["200"]
+    data: list[TeamSummaryOut]
+
+
 #---------------------- Friendly Matches schemas -----------------------
 
 class FriendlyMatchCreate(BaseModel):
