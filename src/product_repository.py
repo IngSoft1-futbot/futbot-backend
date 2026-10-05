@@ -146,6 +146,14 @@ def get_players(db: Session, user_id: int) -> list[models.Player]:
             .all()
         )
 
+def get_teams_by_owner(db : Session, owner_id: int) -> list [models.Team]:
+    return (
+        db.query(models.Team)
+        .filter(models.Team.owner_id == owner_id)
+        .order_by(models.Team.team_id)
+        .all()
+    )
+
 #-----------------FRIENDLY MATCHES-----------------------
 def create_match(
     db: Session,
