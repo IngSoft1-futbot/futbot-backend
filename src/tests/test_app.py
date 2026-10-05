@@ -438,6 +438,69 @@ def test_get_players_sin_token(client, utils_mock):
     assert r.status_code in (401, 403)
     utils_mock.get_players.assert_not_called()
 
+
+#------------------------------------------Obtener Behaviors------------------------------------------
+
+def test_get_behaviors_ok_con_envelope_y_campos_publicos(client, utils_mock):
+    utils_mock.get_behaviors.return_value = [
+        schemas.BehaviorOut(
+            id_behavior=5,
+            name="Defensa",
+            python_code="",
+            is_default=False,
+        )
+    ]
+
+    r = client.get("/users/1/behaviors")
+
+    assert r.status_code == 200
+    assert r.json() == {
+        "status": "200",
+        "data": [{"behavior_id": 5, "name": "Defensa"}],
+        "message": "Behaviors listed successfully.",
+    }
+    utils_mock.get_behaviors.assert_called_once()
+    assert utils_mock.get_behaviors.call_args.args[1] == 1
+
+
+def test_get_behaviors_lista_vacia(client, utils_mock):
+    utils_mock.get_behaviors.return_value = []
+
+    r = client.get("/users/1/behaviors")
+
+    assert r.status_code == 200
+    assert r.json() == {
+        "status": "200",
+        "data": [],
+        "message": "Behaviors listed successfully.",
+    }
+
+
+def test_get_behaviors_usuario_inexistente(client, utils_mock):
+    utils_mock.get_behaviors.side_effect = schemas.UserNotFoundError
+
+    r = client.get("/users/1/behaviors")
+
+    assert r.status_code == 404
+    assert r.json()["detail"] == "User could not be found."
+
+
+def test_get_behaviors_token_de_otro_usuario(client, utils_mock):
+    r = client.get("/users/2/behaviors")
+
+    assert r.status_code == 403
+    assert r.json()["detail"] == "Not allowed to view behaviors of another user."
+    utils_mock.get_behaviors.assert_not_called()
+
+
+def test_get_behaviors_sin_token(client, utils_mock):
+    app.dependency_overrides.pop(get_current_user_id)
+
+    r = client.get("/users/1/behaviors")
+
+    assert r.status_code in (401, 403)
+    utils_mock.get_behaviors.assert_not_called()
+
 #------------------------------------------Crear Partido Amistoso------------------------------------------
 
 FAKE_FRIENDLY_MATCH = {
