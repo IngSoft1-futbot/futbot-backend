@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, Annotated
+from typing import Optional, Annotated, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, StringConstraints, Field
 
 Club = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=50)]
@@ -71,6 +71,22 @@ class PlayerOut(BaseModel):
     pacss_attributes: PacssAttributes
     team_id: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)  # permite leer desde el ORM
+
+class BehaviorOut(BaseModel):
+    id_behavior: int
+    name: str
+    python_code: str
+    is_default: bool
+    model_config = ConfigDict(from_attributes=True)
+
+class BehaviorSummaryOut(BaseModel):
+    behavior_id: int
+    name: str
+
+class BehaviorsListResponse(BaseModel):
+    status: Literal["200"]
+    data: list[BehaviorSummaryOut]
+    message: Literal["Behaviors listed successfully."]
 
 #----------------------Teams schemas-----------------------
 class PlayerAssignment(BaseModel):
