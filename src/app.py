@@ -154,7 +154,42 @@ def get_players(user_id: int, db: Session = Depends(get_db), current_user_id: in
             detail="User could not be found."
         )
  
- 
+
+@app.get(
+    "/users/{user_id}/behaviors",
+    response_model=schemas.BehaviorsListResponse,
+    tags=["Behaviors"],
+)
+def get_behaviors(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    if current_user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not allowed to view behaviors of another user.",
+        )
+    try:
+        behaviors = utils.get_behaviors(db, user_id)
+    except schemas.UserNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User could not be found.",
+        )
+    return schemas.BehaviorsListResponse(
+        status="200",
+        data=[
+            schemas.BehaviorSummaryOut(
+                behavior_id=behavior.id_behavior,
+                name=behavior.name,
+            )
+            for behavior in behaviors
+        ],
+        message="Behaviors listed successfully.",
+    )
+
+
 @app.post(
     "/users/{user_id}/players",
     response_model=schemas.PlayerOut,
