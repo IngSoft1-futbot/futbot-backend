@@ -26,7 +26,7 @@ help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(firstword $(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*?## "}; {printf "  make %-10s %s\n", $$1, $$2}'
 install: ## Crea el venv (si no existe) e instala dependencias
 	test -d $(VENV) || python3 -m venv $(VENV)
-	$(PIP) install fastapi uvicorn sqlalchemy psycopg2-binary email-validator bcrypt pytest httpx2 PyJWT 
+	$(PIP) install fastapi uvicorn sqlalchemy psycopg2-binary email-validator bcrypt pytest httpx2 PyJWT websockets
 
 .env:
 	@printf "SECRET_KEY=%s\nALGORITHM=HS256\n" "$$(openssl rand -hex 32)" > .env && echo ".env creado"

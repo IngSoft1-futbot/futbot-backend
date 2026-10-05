@@ -7,9 +7,12 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from contextlib import asynccontextmanager
+from fastapi import WebSocket, WebSocketDisconnect
+import asyncio
 
 from . import schemas, utils, responses
 from .database import get_db, init_db
+from .simulation import partidos_activos, Amistoso
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -375,6 +378,58 @@ def join_friendly_match(match_id:int,
         raise HTTPException(status.HTTP_409_CONFLICT, "Unable to join: another player has already joined.")
     except schemas.MatchNotJoinableError:
         raise HTTPException(status.HTTP_409_CONFLICT, "The match is no longer available: it is in progress, finished, or cancelled.")
+
+@app.websocket("/ws/amistoso/{match_id}")
+async def ws_amistoso(
+    websocket: WebSocket,
+    match_id: int,
+    token: str,                       # llega como ?token=... en la URL
+):
+    # 1. Autenticación: el user_id sale del token
+    try:
+        user_id = utils.verify_jwt_token(token)
+    except schemas.InvalidTokenError:
+        await websocket.close(code=1008)   # policy violation
+        return
+
+    await websocket.accept()
+
+    # 2. Si el partido no existe, lo instanciamos inyectando el cargador seguro para hilos
+    if match_id not in partidos_activos:
+        partidos_activos[match_id] = Amistoso(
+            match_id,
+            cargar_alineacion=lambda uid: asyncio.to_thread(utils.cargar_alineacion_por_equipo, match_id, uid)
+        )
+    
+    partido = partidos_activos[match_id]
+
+    # 3. Unimos al jugador y guardamos su rol (jugador o espectador)
+    rol = await partido.unir_jugador(user_id, websocket)
+
+    # Por seguridad, si el socket se desconectó por algún motivo, cortamos acá
+    from starlette.websockets import WebSocketState
+    if websocket.client_state == WebSocketState.DISCONNECTED:
+        return
+
+    try:
+        while True:
+            try:
+                data = await websocket.receive_json()
+            except ValueError:  # JSON inválido
+                await websocket.send_json({"tipo": "error", "mensaje": "JSON inválido."})
+                continue
+
+            # 4. Chequeamos el ROL: Solo los jugadores activos pueden mandar comandos
+            if rol == "jugador":
+                ok, msg = partido.aplicar_accion(user_id, data)
+                if not ok:
+                    await websocket.send_json({"tipo": "error", "mensaje": msg})
+            else:
+                await websocket.send_json({"tipo": "error", "mensaje": "Los espectadores no pueden enviar comandos."})
+
+    except WebSocketDisconnect:
+        print(f"El usuario {user_id} cerró la conexión del partido {match_id}.")
+        await partido.desconectar(user_id, websocket)
 
 if __name__ == '__main__':
     import uvicorn
