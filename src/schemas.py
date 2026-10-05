@@ -82,6 +82,7 @@ class PlayerInGame(BaseModel):
     coordinates_y: float
     movement_speed_percentage: int = 0
     kick_countdown: int = 0
+    current_behavior : Action | None
 
 
 class Ball(BaseModel):
@@ -91,6 +92,24 @@ class Ball(BaseModel):
     direction_x: float
     direction_y: float
     owner_id: Optional[int] = None
+
+
+#----------------------Match Environment Schemas-----------
+
+class Action(BaseModel):
+    primitive : str
+    player_id : int
+    args      : dict[str, object] = Field(default_factory=dict)
+
+class Match_State(BaseModel): 
+    ball_data : Ball
+    player_data : list[PlayerInGame]
+    match_data : Match_Data 
+
+class Match_Data(BaseModel):
+    home_team_id: int
+    away_team_id: int | None
+    match_duration: int       
 
 #----------------------Teams schemas-----------------------
 class PlayerAssignment(BaseModel):
