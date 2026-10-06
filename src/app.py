@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 from contextlib import asynccontextmanager
-from fastapi import WebSocket, WebSocketDisconnect
-import asyncio
+from fastapi import WebSocket, WebSocketDisconnect, BackgroundTasks
 
 from . import schemas, utils, responses, product_repository
 from .database import get_db, init_db
@@ -355,13 +354,32 @@ def create_friendly_match(
     tags=["Friendly Matches"],
     responses=responses.JOIN_FRIENDLY_MATCH_RESPONSES
 )
-def join_friendly_match(match_id:int,
-                        join_in:schemas.JoinMatch,
-                        db:Session=Depends(get_db),
-                        current_user_id:int=Depends(get_current_user_id)):
-
+def join_friendly_match(
+    match_id: int,
+    join_in: schemas.JoinMatch,
+    background_tasks: BackgroundTasks,  # 2. Inyectar BackgroundTasks
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
     try:
-        return utils.join_friendly_match(db, current_user_id, match_id, join_in)
+        # Petición a la BD normal y segura (síncrona)
+        res = utils.join_friendly_match(db, current_user_id, match_id, join_in)
+
+        # 3. NOTIFICAR VÍA WEBSOCKET AL CREADOR
+        if match_id in partidos_activos:
+            partido = partidos_activos[match_id]
+            # Pasamos la función asíncrona "difundir" como tarea de fondo
+            background_tasks.add_task(
+                partido.difundir,
+                {
+                    "tipo": "jugador_unido",
+                    "match_id": match_id,
+                    "away_team_id": join_in.team_id  # Usamos team_id según tu schema
+                }
+            )
+
+        return res
+
     except schemas.MatchNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Match not found.")
     except schemas.TeamNotFoundError:
