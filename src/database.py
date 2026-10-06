@@ -97,6 +97,18 @@ def migrate_match_schema() -> None:
         ))
 
 
+def reset_db() -> None:
+    """Elimina el esquema public y lo recrea para limpiar dependencias FK."""
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA public CASCADE;"))
+            connection.execute(text("CREATE SCHEMA public;"))
+    else:
+        Base.metadata.drop_all(bind=engine)
+
+    init_db()
+
+
 def init_db():
     """Crea las tablas que falten y siembra los datos base."""
     Base.metadata.create_all(bind=engine)

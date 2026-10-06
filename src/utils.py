@@ -330,9 +330,35 @@ def create_friendly_match(db: Session, user_id: int, match_in: schemas.FriendlyM
 def get_available_friendly_matches(db: Session):
     """Amistosos disponibles: los que esperan a otro jugador (status open)."""
     try:
-        return repo.get_open_friendly_matches(db)
+        matches = repo.get_open_friendly_matches(db)
+        return [
+            {
+                "id_match": match.id_match,
+                "home_team_id": match.home_team_id,
+                "home_team_name": match.home_team.name,
+                "creator_id": match.home_team.owner_id,
+                "creator_name": match.home_team.owner.name,
+                "match_duration": match.match_duration,
+                "is_private": match.is_private,
+                "away_team_id": match.away_team_id,
+                "status": match.status,
+            }
+            for match in matches
+        ]
     except SQLAlchemyError:
         raise schemas.FriendlyMatchesError()
+
+
+def get_friendly_match_for_user(db: Session, user_id: int, match_id: int):
+    match = repo.get_match(db, match_id)
+    if match is None or not match.is_friendly:
+        raise schemas.MatchNotFoundError()
+    if match.home_team.owner_id != user_id and (
+        match.away_team is None or match.away_team.owner_id != user_id
+    ):
+        raise schemas.MatchNotAuthorizedError()
+    return match
+
 
 def check_match_password(match, password: Optional[str]):
     """Si el partido es privado, la contraseña tiene que venir y coincidir con el hash."""

@@ -352,6 +352,27 @@ def get_friendly_matches(db: Session = Depends(get_db)):
         )
 
 
+@app.get(
+    "/friendly-matches/{match_id}",
+    response_model=schemas.FriendlyMatchOut,
+    tags=["Friendly Matches"],
+)
+def get_friendly_match(
+    match_id: int,
+    db: Session = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    try:
+        return utils.get_friendly_match_for_user(db, current_user_id, match_id)
+    except schemas.MatchNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Match not found.")
+    except schemas.MatchNotAuthorizedError:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "User is not authorized to view this match.",
+        )
+
+
 @app.post(
     "/users/{user_id}/friendly-matches",
     response_model=schemas.FriendlyMatchOut,

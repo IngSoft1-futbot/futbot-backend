@@ -161,8 +161,13 @@ class CreateTeamError(Exception):         #409 condicion de carrera
 class GETFriendlyMatchOut(BaseModel):
     id_match: int
     home_team_id: int
+    home_team_name: str
+    creator_id: int
+    creator_name: str
     match_duration: int
     is_private: bool
+    away_team_id: int | None
+    status: str
 
     model_config = ConfigDict(from_attributes=True)
 
