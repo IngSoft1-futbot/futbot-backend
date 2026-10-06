@@ -577,8 +577,16 @@ def test_create_friendly_match_token_de_otro_usuario(client, utils_mock):
 # --------------   TESTS DE AMISTOSOS   --------------
 
 FAKE_FRIENDLIES = [
-    {"id_match": 1, "home_team_id": 3, "match_duration": 10, "is_private": False},
-    {"id_match": 2, "home_team_id": 4, "match_duration": 15, "is_private": True},
+    {
+        "id_match": 1, "home_team_id": 3, "home_team_name": "Local 1",
+        "creator_id": 7, "creator_name": "Usuario 7", "match_duration": 10,
+        "is_private": False, "away_team_id": None, "status": "open",
+    },
+    {
+        "id_match": 2, "home_team_id": 4, "home_team_name": "Local 2",
+        "creator_id": 8, "creator_name": "Usuario 8", "match_duration": 15,
+        "is_private": True, "away_team_id": None, "status": "open",
+    },
 ]
 
 
@@ -616,6 +624,33 @@ def test_friendly_matches_error_de_base(client, utils_mock):
 
     assert r.status_code == 500
     assert r.json()["detail"] == "Error retrieving matches."
+
+
+def test_get_friendly_match_devuelve_estado_a_un_participante(client, utils_mock):
+    utils_mock.get_friendly_match_for_user.return_value = FAKE_JOINED_MATCH
+
+    r = client.get("/friendly-matches/10")
+
+    assert r.status_code == 200
+    assert r.json()["status"] == "started"
+    _, user_id, match_id = utils_mock.get_friendly_match_for_user.call_args.args
+    assert (user_id, match_id) == (1, 10)
+
+
+@pytest.mark.parametrize(
+    "error, status_code",
+    [
+        (schemas.MatchNotFoundError, 404),
+        (schemas.MatchNotAuthorizedError, 403),
+    ],
+)
+def test_get_friendly_match_errores_de_acceso(client, utils_mock, error, status_code):
+    utils_mock.get_friendly_match_for_user.side_effect = error
+
+    r = client.get("/friendly-matches/10")
+
+    assert r.status_code == status_code
+
 
 # --------------   TESTS DE UNIRSE A AMISTOSO   --------------
 

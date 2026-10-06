@@ -253,14 +253,23 @@ def test_player_out_se_construye_desde_un_objeto_orm():
 
 def test_friendly_match_out_se_construye_desde_un_objeto_orm():
     orm_match = SimpleNamespace(
-        id_match=1, home_team_id=3, match_duration=10, is_private=True,
+        id_match=1, home_team_id=3, home_team_name="Equipo local",
+        creator_id=4, creator_name="Creador", match_duration=10, is_private=True,
         away_team_id=None, status="open", password="secreta",   # atributos de mas: se ignoran
     )
 
     out = schemas.GETFriendlyMatchOut.model_validate(orm_match)
 
     assert out.model_dump() == {
-        "id_match": 1, "home_team_id": 3, "match_duration": 10, "is_private": True,
+        "id_match": 1,
+        "home_team_id": 3,
+        "home_team_name": "Equipo local",
+        "creator_id": 4,
+        "creator_name": "Creador",
+        "match_duration": 10,
+        "is_private": True,
+        "away_team_id": None,
+        "status": "open",
     }
 
 
