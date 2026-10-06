@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import WebSocket, WebSocketDisconnect
 import asyncio
 
-from . import schemas, utils, responses
+from . import schemas, utils, responses, product_repository
 from .database import get_db, init_db
 from .simulation import partidos_activos, Amistoso
 
@@ -398,7 +398,7 @@ async def ws_amistoso(
     if match_id not in partidos_activos:
         partidos_activos[match_id] = Amistoso(
             match_id,
-            cargar_alineacion=lambda uid: asyncio.to_thread(utils.cargar_alineacion_por_equipo, match_id, uid)
+            cargar_alineacion=lambda uid: product_repository.cargar_alineacion_por_equipo(match_id, uid)
         )
     
     partido = partidos_activos[match_id]

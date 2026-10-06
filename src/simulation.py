@@ -263,7 +263,7 @@ class MotorPartido:
             "tipo": "sys",
             "mensaje": f"¡Gol! El Equipo {num_eq} anota. Marcador: {self.marcador['eq1']} - {self.marcador['eq2']}"
         })
-        self.reponer_posiciones()   # saque de centro
+        self.reponer_posiciones() 
 
     def _fin_de_tiempo(self) -> str:
         if self.tiempo_actual == TOTAL_TIEMPOS:
@@ -344,7 +344,7 @@ class Amistoso:
         self.jugadores_ws: dict[int, WebSocket] = {}   # max. 2
         self.espectadores_ws: set[WebSocket] = set()
         self.motor: MotorPartido | None = None          # se crea al unirse el 2do jugador
-        self.tarea: asyncio.Task | None = None          # referencia fuerte a la tarea
+        self.tarea: asyncio.Task | None = None          
 
     @property
     def estado_partido(self) -> Estado:
@@ -356,7 +356,6 @@ class Amistoso:
         if inspect.iscoroutinefunction(self.cargar_alineacion):
             datos = await self.cargar_alineacion(user_id)
         else:
-            # funcion sincrona (ej. consulta a la BD): en un hilo para no frenar el loop de ticks
             datos = await asyncio.to_thread(self.cargar_alineacion, user_id)
         return validar_alineacion(datos)
 
@@ -367,20 +366,17 @@ class Amistoso:
             await ws.send_json({"tipo": "error", "mensaje": "El partido ya finalizó."})
             return "espectador"
 
-        # --- LÓGICA DE RECONEXIÓN ---
         # Si el partido ya arrancó y el usuario es uno de los dueños originales:
         if self.motor is not None and user_id in self.motor.ids:
             self.jugadores_ws[user_id] = ws
             await ws.send_json({"tipo": "sys", "mensaje": f"¡Reconectado exitosamente al partido {self.match_id}!"})
             return "jugador"
-        # ----------------------------
 
         es_jugador = user_id in self.jugadores_ws or (
             self.motor is None and len(self.jugadores_ws) < 2
         )
         if not es_jugador:
-            # Primero el saludo y despues el registro: si el socket ya esta caido,
-            # la excepcion sube al endpoint y no queda un espectador fantasma.
+            # La excepcion sube al endpoint y no queda un espectador fantasma.
             await ws.send_json({"tipo": "sys", "mensaje": f"Mirando el partido {self.match_id}."})
             self.espectadores_ws.add(ws)
             return "espectador"
