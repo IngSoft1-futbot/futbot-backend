@@ -6,6 +6,23 @@ from src import models, product_repository as repo
 from src.database import seed_predefined_behaviors
 
 
+def test_match_schema_supports_open_friendly_matches():
+    columns = models.Match.__table__.columns
+
+    assert {
+        "in_progress",
+        "is_friendly",
+        "status",
+        "password",
+    }.issubset(columns.keys())
+    assert all(
+        columns[column].nullable
+        for column in ("away_team_id", "league_id", "scheduled_at", "in_progress", "password")
+    )
+    assert str(columns["is_friendly"].server_default.arg).upper() == "TRUE"
+    assert str(columns["status"].server_default.arg).strip("'") == "open"
+
+
 def test_seed_predefined_behaviors_creates_and_updates_three_system_rows():
     engine = create_engine(
         "sqlite://",

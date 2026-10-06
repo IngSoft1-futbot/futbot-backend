@@ -507,10 +507,20 @@ def test_create_team_integrity_error_se_traduce(db, repo_team):
 # --------------   TESTS DE AMISTOSOS   --------------
 
 def test_get_friendly_matches_devuelve_lo_que_trae_el_repository(db, repo_mock):
-    matches = [SimpleNamespace(id_match=1), SimpleNamespace(id_match=2)]
+    owner = SimpleNamespace(id=1, name="Juan")
+    home_team = SimpleNamespace(team_id=3, name="Equipo Juan", owner_id=1, owner=owner)
+    matches = [
+        SimpleNamespace(
+            id_match=1, home_team_id=3, home_team=home_team, match_duration=2,
+            is_private=False, away_team_id=None, status="open",
+        )
+    ]
     repo_mock.get_open_friendly_matches.return_value = matches
 
-    assert utils.get_available_friendly_matches(db) == matches
+    result = utils.get_available_friendly_matches(db)
+    assert result[0]["id_match"] == 1
+    assert result[0]["creator_id"] == 1
+    assert result[0]["status"] == "open"
     repo_mock.get_open_friendly_matches.assert_called_once_with(db)
 
 
@@ -532,6 +542,29 @@ def test_get_friendly_matches_no_esconde_errores_que_no_son_de_la_base(db, repo_
 
     with pytest.raises(AttributeError):
         utils.get_available_friendly_matches(db)
+
+
+def test_get_friendly_match_for_user_solo_permite_a_participantes(db, repo_mock):
+    home_team = SimpleNamespace(owner_id=1)
+    away_team = SimpleNamespace(owner_id=2)
+    match = SimpleNamespace(
+        is_friendly=True, home_team=home_team, away_team=away_team,
+    )
+    repo_mock.get_match.return_value = match
+
+    assert utils.get_friendly_match_for_user(db, 2, 10) is match
+    repo_mock.get_match.assert_called_once_with(db, 10)
+
+
+def test_get_friendly_match_for_user_rechaza_no_participantes(db, repo_mock):
+    repo_mock.get_match.return_value = SimpleNamespace(
+        is_friendly=True,
+        home_team=SimpleNamespace(owner_id=1),
+        away_team=None,
+    )
+
+    with pytest.raises(schemas.MatchNotAuthorizedError):
+        utils.get_friendly_match_for_user(db, 3, 10)
  
  
 # ---------- PlayerOut ----------

@@ -577,8 +577,16 @@ def test_create_friendly_match_token_de_otro_usuario(client, utils_mock):
 # --------------   TESTS DE AMISTOSOS   --------------
 
 FAKE_FRIENDLIES = [
-    {"id_match": 1, "home_team_id": 3, "match_duration": 10, "is_private": False},
-    {"id_match": 2, "home_team_id": 4, "match_duration": 15, "is_private": True},
+    {
+        "id_match": 1, "home_team_id": 3, "home_team_name": "Local 1",
+        "creator_id": 7, "creator_name": "Usuario 7", "match_duration": 10,
+        "is_private": False, "away_team_id": None, "status": "open",
+    },
+    {
+        "id_match": 2, "home_team_id": 4, "home_team_name": "Local 2",
+        "creator_id": 8, "creator_name": "Usuario 8", "match_duration": 15,
+        "is_private": True, "away_team_id": None, "status": "open",
+    },
 ]
 
 
@@ -617,17 +625,44 @@ def test_friendly_matches_error_de_base(client, utils_mock):
     assert r.status_code == 500
     assert r.json()["detail"] == "Error retrieving matches."
 
+
+def test_get_friendly_match_devuelve_estado_a_un_participante(client, utils_mock):
+    utils_mock.get_friendly_match_for_user.return_value = FAKE_JOINED_MATCH
+
+    r = client.get("/friendly-matches/10")
+
+    assert r.status_code == 200
+    assert r.json()["status"] == "started"
+    _, user_id, match_id = utils_mock.get_friendly_match_for_user.call_args.args
+    assert (user_id, match_id) == (1, 10)
+
+
+@pytest.mark.parametrize(
+    "error, status_code",
+    [
+        (schemas.MatchNotFoundError, 404),
+        (schemas.MatchNotAuthorizedError, 403),
+    ],
+)
+def test_get_friendly_match_errores_de_acceso(client, utils_mock, error, status_code):
+    utils_mock.get_friendly_match_for_user.side_effect = error
+
+    r = client.get("/friendly-matches/10")
+
+    assert r.status_code == status_code
+
+
 # --------------   TESTS DE UNIRSE A AMISTOSO   --------------
 
 FAKE_JOINED_MATCH = {**FAKE_FRIENDLY_MATCH, "away_team_id": 5, "status": "started"}
 JOIN_BODY = {"team_id": 5}
-JOIN_URL = "/friendly-matches/10/away-team"
+JOIN_URL = "/friendly-matches/10/join"
 
 
 def test_join_ok(client, utils_mock):
     utils_mock.join_friendly_match.return_value = FAKE_JOINED_MATCH
 
-    r = client.put(JOIN_URL, json=JOIN_BODY)
+    r = client.post(JOIN_URL, json=JOIN_BODY)
 
     assert r.status_code == 200
     body = r.json()
@@ -640,7 +675,7 @@ def test_join_ok(client, utils_mock):
 def test_join_no_expone_la_password(client, utils_mock):
     utils_mock.join_friendly_match.return_value = {**FAKE_JOINED_MATCH, "password": "hash-secreto"}
 
-    r = client.put(JOIN_URL, json=JOIN_BODY)
+    r = client.post(JOIN_URL, json=JOIN_BODY)
 
     assert "password" not in r.json()
 
@@ -649,7 +684,7 @@ def test_join_pasa_user_match_y_schema_a_utils(client, utils_mock):
     app.dependency_overrides[get_current_user_id] = lambda: 42
     utils_mock.join_friendly_match.return_value = FAKE_JOINED_MATCH
 
-    client.put("/friendly-matches/7/away-team", json={"team_id": 5, "password": "Secreta1!"})
+    client.post("/friendly-matches/7/join", json={"team_id": 5, "password": "Secreta1!"})
 
     _, user_id, match_id, join_in = utils_mock.join_friendly_match.call_args.args
     assert user_id == 42            # sale del token, no del body
@@ -676,7 +711,7 @@ def test_join_pasa_user_match_y_schema_a_utils(client, utils_mock):
 def test_join_errores_de_negocio(client, utils_mock, error, status_code, detail):
     utils_mock.join_friendly_match.side_effect = error
 
-    r = client.put(JOIN_URL, json=JOIN_BODY)
+    r = client.post(JOIN_URL, json=JOIN_BODY)
 
     assert r.status_code == status_code
     assert r.json()["detail"] == detail
@@ -685,13 +720,13 @@ def test_join_errores_de_negocio(client, utils_mock, error, status_code, detail)
 @pytest.mark.parametrize(
     "url, body",
     [
-        ("/friendly-matches/abc/away-team", {"team_id": 5}),    # match_id no numerico
+        ("/friendly-matches/abc/join", {"team_id": 5}),         # match_id no numerico
         (JOIN_URL, {}),                                          # falta team_id
         (JOIN_URL, {"team_id": "abc"}),                          # team_id no numerico
     ],
 )
 def test_join_422(client, utils_mock, url, body):
-    r = client.put(url, json=body)
+    r = client.post(url, json=body)
 
     assert r.status_code == 422
     utils_mock.join_friendly_match.assert_not_called()
@@ -700,7 +735,16 @@ def test_join_422(client, utils_mock, url, body):
 def test_join_sin_token(client, utils_mock):
     app.dependency_overrides.pop(get_current_user_id)
 
-    r = client.put(JOIN_URL, json=JOIN_BODY)
+    r = client.post(JOIN_URL, json=JOIN_BODY)
 
     assert r.status_code in (401, 403)   # depende de la version de FastAPI
     utils_mock.join_friendly_match.assert_not_called()
+
+
+def test_join_ruta_legacy_sigue_disponible(client, utils_mock):
+    utils_mock.join_friendly_match.return_value = FAKE_JOINED_MATCH
+
+    r = client.put("/friendly-matches/10/away-team", json=JOIN_BODY)
+
+    assert r.status_code == 200
+    utils_mock.join_friendly_match.assert_called_once()
