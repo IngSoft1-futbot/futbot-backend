@@ -279,8 +279,13 @@ Cada elemento de la lista:
 {
   "id_match": 1,
   "home_team_id": 3,
+  "home_team_name": "Equipo local",
+  "creator_id": 7,
+  "creator_name": "Usuario",
   "match_duration": 10,
-  "is_private": false
+  "is_private": false,
+  "away_team_id": null,
+  "status": "open"
 }
 ```
 
@@ -288,6 +293,9 @@ Cada elemento de la lista:
 **Disponible:** amistoso (`is_friendly`) con `status` abierto. Los que ya empezaron, terminaron o se cancelaron no aparecen, y tampoco los partidos de liga.
 **Privados:** aparecen en el listado con `is_private: true`. La contraseña nunca se devuelve; se valida al unirse al partido.
 **Duracion:** `match_duration` es la duracion propia del amistoso, en minutos.
+
+### Consultar el estado de una sala
+`GET /friendly-matches/{match_id}` devuelve el estado actualizado del amistoso. Requiere token Bearer y solo permite la consulta al creador o al visitante asignado. El creador usa esta ruta mientras espera al rival y entra al partido cuando el estado cambia a `started`.
 
 ### Tests
 Cada capa prueba lo suyo: schemas (`FriendlyMatchOut` desde el objeto de la base), repository (el filtro, con SQLite en memoria), utils (traduccion del error de la base) y app (200, lista vacia, 500 y que no se exponga la contraseña).
