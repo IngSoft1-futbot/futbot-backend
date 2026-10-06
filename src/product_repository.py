@@ -3,7 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy import update
 from . import models, schemas
-
+from src.database import SessionLocal
 
 def get_user_by_email(db: Session, *, email: str) -> Optional[models.User]:
     return db.query(models.User).filter(models.User.email == email).first()
@@ -226,3 +226,49 @@ def join_match(db: Session, *, match_id: int, away_team_id: int) -> Optional[mod
     if result.rowcount != 1:
         return None
     return db.get(models.Match, match_id, populate_existing=True)
+
+#------------ Cargar alineación por equipo ------------
+
+def cargar_alineacion_por_equipo(match_id: int, user_id: int) -> list[dict]:
+    with SessionLocal() as db:
+        partido = db.query(models.Match).filter(models.Match.id_match == match_id).first()
+        if not partido:
+            raise ValueError("El partido no existe.")
+        
+        mi_equipo = None
+        for team_id in [partido.home_team_id, partido.away_team_id]:
+            if team_id is None:
+                continue
+            
+            equipo = db.query(models.Team).filter(models.Team.team_id == team_id).first()
+            if equipo and equipo.owner_id == user_id:
+                mi_equipo = equipo
+                break
+                
+        if not mi_equipo:
+            raise ValueError("No estás registrado en este partido con ningún equipo.")
+            
+
+        titulares = sorted((p for p in mi_equipo.players if p.is_starter), key=lambda p: p.player_id)
+        
+        if len(titulares) != 3:
+            raise ValueError("Tu equipo no tiene exactamente 3 titulares configurados.")
+            
+        alineacion = []
+        for jug in titulares:
+            if jug.behavior_id is None:
+                raise ValueError(f"El jugador {jug.name} no tiene comportamiento asignado.")
+                
+            alineacion.append({
+                "player_id": jug.player_id,
+                "nombre": jug.name,
+                "behavior_id": jug.behavior_id,
+                "stats": {
+                    "speed": jug.speed,
+                    "control": jug.control,
+                    "strength": jug.strength,
+                    "power": jug.power,
+                    "agility": jug.agility
+                }
+            })
+        return alineacion
